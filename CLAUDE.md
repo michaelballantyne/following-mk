@@ -33,7 +33,7 @@ Reformat in place:
 
 ```
 raco fmt -i following.scm restricted-interp.scm restricted-interp-following.scm \
-           tests.scm synthesis-benchmarks.scm
+           tests.scm synthesis/*.scm
 ```
 
 Preview without writing:

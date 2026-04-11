@@ -107,7 +107,7 @@ following.scm                     conde/d, follower, counters, /d wrappers
 restricted-interp.scm             plain relational interpreter (Osera/Zdancewic)
 restricted-interp-following.scm   /d version of the same interpreter
 tests.scm                         sanity tests (runnable standalone)
-synthesis-benchmarks.scm          synthesis benchmarks (drive via run.sh)
+synthesis/                        synthesis benchmarks (drive via run.sh)
 run.sh                            driver for synthesis experiments
 claude/                           design notes
 ```
@@ -131,7 +131,7 @@ chez --script tests.scm
 The synthesis benchmarks don't — use `run.sh`:
 
 ```
-./run.sh synthesis-benchmarks.scm
+./run.sh synthesis/append-full.scm
 ```
 
 `run.sh` flags (all optional; unset flags leave the make-parameter
@@ -152,7 +152,7 @@ Example: run the synthesis file with a lower suspend depth and the
 interrupt handler installed, so Ctrl-C dumps counters before exit:
 
 ```
-./run.sh --suspend-depth 20 --dump-on-interrupt synthesis-benchmarks.scm
+./run.sh --suspend-depth 20 --dump-on-interrupt synthesis/rember-full.scm
 ```
 
 ## Notes
