@@ -2,6 +2,9 @@
 ;; exploration is really aiming at and which aren't all terminating cleanly
 ;; yet.  Start with test-following.scm for sanity tests; come here to poke at
 ;; the open problems.
+;;
+;; Run via `./run.sh test-following-synthesis.scm` -- this file does not
+;; load its own infrastructure, so `chez --script` on it directly will fail.
 
 (time (test "synthesize append with follower swapped"
             (run 1 (q)

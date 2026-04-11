@@ -39,6 +39,8 @@ if [[ $# -eq 0 ]]; then
   exit 1
 fi
 
+tmp=$(mktemp -t following-mk.XXXXXX)
+trap 'rm -f "$tmp"' EXIT
 {
   echo '(load "load.scm")'
   echo '(load "restricted-interp.scm")'
@@ -50,4 +52,5 @@ fi
   for f in "$@"; do
     printf '(load "%s")\n' "$f"
   done
-} | exec chez --quiet
+} > "$tmp"
+chez --script "$tmp"
