@@ -10,6 +10,8 @@
 #   --check-follower-every N set *check-follower-every*  (main search throttle)
 #   --print-follower        enable *print-follower-term*
 #   --dump-on-interrupt     install Ctrl-C counter-dump handler
+#   --timeout SECS          kill the chez process if it runs longer than SECS
+#                           (prints "TIMEOUT after SECS" and exits 124)
 #   -h, --help              show this help
 set -e
 cd "$(dirname "$0")"
@@ -20,9 +22,10 @@ MAIN_DEPTH=
 CHECK_EVERY=
 PRINT_FOLLOWER=
 DUMP_ON_INT=
+TIMEOUT=
 
 usage() {
-  sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 while [[ $# -gt 0 ]]; do
@@ -33,6 +36,7 @@ while [[ $# -gt 0 ]]; do
     --check-follower-every)  CHECK_EVERY="$2"; shift 2 ;;
     --print-follower)        PRINT_FOLLOWER=1; shift ;;
     --dump-on-interrupt)     DUMP_ON_INT=1; shift ;;
+    --timeout)               TIMEOUT="$2"; shift 2 ;;
     -h|--help)               usage; exit 0 ;;
     --)                      shift; break ;;
     -*)                      echo "unknown flag: $1" >&2; usage >&2; exit 1 ;;
@@ -61,4 +65,29 @@ trap 'rm -f "$tmp"' EXIT
     printf '(load "%s")\n' "$f"
   done
 } > "$tmp"
-chez --script "$tmp"
+
+if [[ -n $TIMEOUT ]]; then
+  chez --script "$tmp" &
+  chez_pid=$!
+  sleep "$TIMEOUT" &
+  sleep_pid=$!
+  # Poll until either chez or the sleep finishes.  macOS bash 3.2 doesn't
+  # support `wait -n`, so poll with `kill -0` at 100ms.
+  while kill -0 "$chez_pid" 2>/dev/null && kill -0 "$sleep_pid" 2>/dev/null; do
+    sleep 0.1
+  done
+  set +e
+  if kill -0 "$chez_pid" 2>/dev/null; then
+    kill -9 "$chez_pid" 2>/dev/null
+    wait "$chez_pid" 2>/dev/null
+    echo "TIMEOUT after ${TIMEOUT}s" >&2
+    exit 124
+  fi
+  wait "$chez_pid"
+  rc=$?
+  kill "$sleep_pid" 2>/dev/null
+  wait "$sleep_pid" 2>/dev/null
+  exit "$rc"
+else
+  chez --script "$tmp"
+fi

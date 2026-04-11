@@ -144,6 +144,8 @@ defaults in place):
 --check-follower-every N  set *check-follower-every*   (main search throttle)
 --print-follower          enable *print-follower-term*
 --dump-on-interrupt       install Ctrl-C counter-dump handler
+--timeout SECS            kill the chez process after SECS wall-clock seconds,
+                          print "TIMEOUT after SECS" to stderr, exit 124
 ```
 
 Example: run the synthesis file with a lower suspend depth and the

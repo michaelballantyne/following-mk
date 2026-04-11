@@ -1,6 +1,6 @@
-;; Small rember synthesis task -- the program body is almost fully
+;; rember, hole 1 (smallest): the program body is almost fully
 ;; known, with just one symbol hole (`,p`) in place of `e` in the
-;; `(= a e)` comparison.  The expected answer is p = e.
+;; `(= a e)` comparison.  Expected answer: p = e.
 ;;
 ;; Three examples in the "good" order.  Two examples alone don't
 ;; constrain the hole uniquely (both p=a and p=e satisfy them), so
@@ -10,43 +10,11 @@
 ;; around evalo/d, and without.  Intended for side-by-side counter
 ;; comparison when debugging whether the follower is helping.
 ;;
-;; Run via `./run.sh synthesis-small.scm`.
+;; Run via `./run.sh synthesis/rember-1.scm`.
 
 (time
-  (test "small rember with follower"
+  (test "rember hole-1 no follower"
     (run 1 (p)
-      (follower p
-        (fresh/d ()
-          ;; ex1
-          (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
-                                       (match l
-                                         ['() l]
-                                         [(cons a d)
-                                          (if (= a ,p)
-                                              d
-                                              (cons a (rember e d)))]))])
-                      (rember 5 '()))
-                   '())
-          ;; ex2
-          (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
-                                       (match l
-                                         ['() l]
-                                         [(cons a d)
-                                          (if (= a ,p)
-                                              d
-                                              (cons a (rember e d)))]))])
-                      (rember 6 (cons 6 '())))
-                   '())
-          ;; ex3 -- discriminates p = e from p = a
-          (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
-                                       (match l
-                                         ['() l]
-                                         [(cons a d)
-                                          (if (= a ,p)
-                                              d
-                                              (cons a (rember e d)))]))])
-                      (rember 7 (cons 3 '())))
-                   '(3))))
       ;; ex1
       (evalo `(letrec ([rember (lambda (e l) : ((number list) -> list)
                                  (match l
@@ -80,8 +48,40 @@
     '(e)))
 
 (time
-  (test "small rember no follower"
+  (test "rember hole-1 with follower"
     (run 1 (p)
+      (follower p
+        (fresh/d ()
+          ;; ex1
+          (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
+                                       (match l
+                                         ['() l]
+                                         [(cons a d)
+                                          (if (= a ,p)
+                                              d
+                                              (cons a (rember e d)))]))])
+                      (rember 5 '()))
+                   '())
+          ;; ex2
+          (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
+                                       (match l
+                                         ['() l]
+                                         [(cons a d)
+                                          (if (= a ,p)
+                                              d
+                                              (cons a (rember e d)))]))])
+                      (rember 6 (cons 6 '())))
+                   '())
+          ;; ex3 -- discriminates p = e from p = a
+          (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
+                                       (match l
+                                         ['() l]
+                                         [(cons a d)
+                                          (if (= a ,p)
+                                              d
+                                              (cons a (rember e d)))]))])
+                      (rember 7 (cons 3 '())))
+                   '(3))))
       ;; ex1
       (evalo `(letrec ([rember (lambda (e l) : ((number list) -> list)
                                  (match l
