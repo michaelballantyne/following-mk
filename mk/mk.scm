@@ -167,27 +167,44 @@
 ; State object.
 ; The state is the value that is monadically passed through the search
 ; Contains:
-;   S - the substitution
-;   C - the constraint store
-;   F - follower cell (#f or (goal . term)), used by following.scm
+;   S  - the substitution
+;   C  - the constraint store
+;   F  - follower cell (#f or (goal . term)), used by following.scm
+;   D  - main-search depth counter (patched in for the unsound main-depth
+;        cutoff; each conde call increments it)
+;   FC - follower-check counter (patched in for *check-follower-every*;
+;        each conde call increments it, and the follower is only fired
+;        when FC reaches the configured threshold)
 
-(define (state S C F) (list S C F))
+(define (state S C F D FC) (list S C F D FC))
 
 (define (state-S st) (car st))
 (define (state-C st) (cadr st))
 (define (state-F st) (caddr st))
+(define (state-D st) (cadddr st))
+(define (state-FC st) (car (cddddr st)))
 
-(define empty-state (state empty-subst empty-C #f))
+(define empty-state (state empty-subst empty-C #f 0 0))
 
 (define (state-with-C st C^)
-  (state (state-S st) C^ (state-F st)))
+  (state (state-S st) C^ (state-F st) (state-D st) (state-FC st)))
 
 (define (state-with-F st F^)
-  (state (state-S st) (state-C st) F^))
+  (state (state-S st) (state-C st) F^ (state-D st) (state-FC st)))
+
+(define (state-with-D st D^)
+  (state (state-S st) (state-C st) (state-F st) D^ (state-FC st)))
+
+(define (state-with-FC st FC^)
+  (state (state-S st) (state-C st) (state-F st) (state-D st) FC^))
 
 (define state-with-scope
   (lambda (st new-scope)
-    (state (subst-with-scope (state-S st) new-scope) (state-C st) (state-F st))))
+    (state (subst-with-scope (state-S st) new-scope)
+           (state-C st)
+           (state-F st)
+           (state-D st)
+           (state-FC st))))
 
 ; Unification
 
@@ -338,14 +355,16 @@
              (bind* (g0 st) g ...))))))))
 
 ; (conde [g:Goal ...] ...+) -> Goal
-; Before branching, give any stored follower a chance to fire on the
-; current state (trigger-followers is defined in following.scm).
+; Before branching, run the main-conde-hook: increment the main-search
+; depth (fail if it exceeds *main-unsound-depth*), increment the
+; follower-check counter, and fire the follower every Nth conde per
+; *check-follower-every*.  main-conde-hook is defined in following.scm.
 (define-syntax conde
   (syntax-rules ()
     ((_ (g0 g ...) (g1 g^ ...) ...)
      (lambda (st)
        (bind
-        ((trigger-followers) st)
+        ((main-conde-hook) st)
         (lambda (st)
           (suspend
             (let ((st (state-with-scope st (new-scope))))
@@ -514,7 +533,13 @@
   (lambda (st)
     (let-values (((S^ added) (unify u v (state-S st))))
       (if S^
-        (and-foldl update-constraints (state S^ (state-C st) (state-F st)) added)
+        (and-foldl update-constraints
+                   (state S^
+                          (state-C st)
+                          (state-F st)
+                          (state-D st)
+                          (state-FC st))
+                   added)
         #f))))
 
 ; Not fully optimized. Could do absento update with fewer

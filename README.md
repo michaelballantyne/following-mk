@@ -20,7 +20,7 @@ forward only where the current state uniquely forces a choice, and stall
 [Andorra Principle](https://en.wikipedia.org/wiki/Andorra_Kernel_Language)
 from Andorra Prolog, applied locally to one wrapped goal.
 
-You wrap a goal with `(follower name term goal)`. The goal runs in
+You wrap a goal with `(follower term goal)`. The goal runs in
 determinacy mode against the current state. Three outcomes:
 
 - **fail** — the outer search fails on this branch
@@ -64,15 +64,29 @@ and evaluate a partial program forward wherever determinacy allows.
 Two depth knobs on `conde/d` evaluation, both thread through `bind/d*`
 and `fresh/d`:
 
-- **`*unsound-fail-depth*`** — *unsound* cutoff. When exceeded, the
-  follower fails outright. Defaults to `+inf.0` (disabled). Intended as
-  a diagnostic knob: starve a diverging branch out of the scheduler so
-  pruning on the surviving branch becomes observable. Not an optimization
-  — a pure debugging tool, and **it can break correctness**.
-- **`*suspend-depth*`** — *sound* cutoff. When exceeded, the follower
-  suspends (same recovery as genuine incomplete work). Defaults to 100.
-  Lower this to make the follower give up more readily; raise it to let
-  it run deeper before suspending.
+- **`*unsound-fail-depth*`** — *unsound* cutoff inside the follower.
+  When exceeded, the follower fails outright. Defaults to `+inf.0`
+  (disabled). Intended as a diagnostic knob: starve a diverging branch
+  out of the scheduler so pruning on the surviving branch becomes
+  observable. Not an optimization — a pure debugging tool, and
+  **it can break correctness**.
+- **`*suspend-depth*`** — *sound* cutoff inside the follower. When
+  exceeded, the follower suspends (same recovery as genuine incomplete
+  work). Defaults to 100. Lower to make the follower give up more
+  readily; raise to let it run deeper before suspending.
+
+Two more parameters govern the *main* miniKanren search (threaded
+through outer state, not inside the follower):
+
+- **`*main-unsound-depth*`** — *unsound* cutoff on the main search,
+  counted per `conde` entry. When exceeded, the branch fails outright.
+  Parallel to `*unsound-fail-depth*`, same caveat: diagnostic only,
+  **can break correctness**. Defaults to `+inf.0` (disabled).
+- **`*check-follower-every*`** — throttle on how often the follower
+  fires from the main search's conde hook. Default 1 means "fire on
+  every conde" (original behavior). Setting it to 10 means "fire on
+  every 10th conde" — less follower overhead, at the cost of firing
+  later and possibly missing pruning opportunities.
 
 Two other parameters tune instrumentation:
 
@@ -124,10 +138,12 @@ The synthesis benchmarks don't — use `run.sh`:
 defaults in place):
 
 ```
---unsound-fail-depth N   set *unsound-fail-depth*
---suspend-depth N        set *suspend-depth*
---print-follower         enable *print-follower-term*
---dump-on-interrupt      install Ctrl-C counter-dump handler
+--unsound-fail-depth N    set *unsound-fail-depth*     (follower, UNSOUND)
+--suspend-depth N         set *suspend-depth*          (follower, sound)
+--main-unsound-depth N    set *main-unsound-depth*     (main search, UNSOUND)
+--check-follower-every N  set *check-follower-every*   (main search throttle)
+--print-follower          enable *print-follower-term*
+--dump-on-interrupt       install Ctrl-C counter-dump handler
 ```
 
 Example: run the synthesis file with a lower suspend depth and the

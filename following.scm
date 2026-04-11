@@ -49,6 +49,26 @@
 
 (define *suspend-depth* (make-parameter 100))
 
+;;; --- main-search parameters (threaded through the outer state, not
+;;; the follower's internal search)
+;;;
+;;; *main-unsound-depth*: UNSOUND cutoff on the main search.  Each
+;;; patched `conde` in mk.scm increments the main-search depth counter
+;;; `state-D`; when D exceeds this limit, the branch fails outright.
+;;; Parallel to `*unsound-fail-depth*` for the follower; same caveat
+;;; (not an optimization, a diagnostic knob for starving diverging
+;;; branches).  Default +inf.0 (disabled).
+;;;
+;;; *check-follower-every*: throttle on how often the follower is
+;;; fired from the main search's conde hook.  `state-FC` counts conde
+;;; calls since the last follower fire; the follower is only triggered
+;;; when FC reaches this value (and FC is reset to 0 when it does).
+;;; Default 1 means "fire on every conde" (the original behavior).
+
+(define *main-unsound-depth* (make-parameter +inf.0))
+
+(define *check-follower-every* (make-parameter 1))
+
 ;;; When non-#f, `trigger-followers` prints the reified follower term each
 ;;; time it fires, so you can watch synthesis progress through the follower.
 (define *print-follower-term* (make-parameter #f))
@@ -67,11 +87,20 @@
 
 (define *unsound-fail-depth-cutoff-counter* 0)
 (define *suspend-depth-cutoff-counter* 0)
+(define *main-unsound-depth-cutoff-counter* 0)
 (define *==-counter* 0)
 (define *==/d-counter* 0)
 (define *fail-counter* 0)
 (define *singleton-succeed-counter* 0)
 (define *non-singleton-succeed-counter* 0)
+;; A follower trigger is "externally productive" if walking the
+;; follower's term under the post-trigger substitution differs from
+;; walking it under the pre-trigger substitution -- i.e. the trigger
+;; committed at least one new binding visible to the outer search via
+;; a variable reachable from the term.  Internal fresh-var bindings
+;; don't count.
+(define *externally-productive-trigger-counter* 0)
+(define *externally-unproductive-trigger-counter* 0)
 (define *user-counter* 0)
 
 (define-syntax increment-counter!
@@ -81,21 +110,29 @@
 (define (reset-counters!)
   (set! *unsound-fail-depth-cutoff-counter* 0)
   (set! *suspend-depth-cutoff-counter* 0)
+  (set! *main-unsound-depth-cutoff-counter* 0)
   (set! *==-counter* 0)
   (set! *==/d-counter* 0)
   (set! *fail-counter* 0)
   (set! *singleton-succeed-counter* 0)
   (set! *non-singleton-succeed-counter* 0)
+  (set! *externally-productive-trigger-counter* 0)
+  (set! *externally-unproductive-trigger-counter* 0)
   (set! *user-counter* 0))
 
 (define (print-counters!)
   (printf "*unsound-fail-depth-cutoff-counter*: ~s\n" *unsound-fail-depth-cutoff-counter*)
   (printf "*suspend-depth-cutoff-counter*: ~s\n" *suspend-depth-cutoff-counter*)
+  (printf "*main-unsound-depth-cutoff-counter*: ~s\n" *main-unsound-depth-cutoff-counter*)
   (printf "*==-counter*: ~s\n" *==-counter*)
   (printf "*==/d-counter*: ~s\n" *==/d-counter*)
   (printf "*fail-counter*: ~s\n" *fail-counter*)
   (printf "*singleton-succeed-counter*: ~s\n" *singleton-succeed-counter*)
   (printf "*non-singleton-succeed-counter*: ~s\n" *non-singleton-succeed-counter*)
+  (printf "*externally-productive-trigger-counter*: ~s\n"
+          *externally-productive-trigger-counter*)
+  (printf "*externally-unproductive-trigger-counter*: ~s\n"
+          *externally-unproductive-trigger-counter*)
   (printf "*user-counter*: ~s\n" *user-counter*))
 
 ;;; Goal that increments *user-counter* for ad-hoc instrumentation.
@@ -155,26 +192,27 @@
 
 ;;; --- follower
 ;;;
-;;; (follower name term goal)
+;;; (follower term goal)
 ;;;   Run `goal` once against the current state in a fresh scope.
 ;;;   - fail    -> fail the outer search
 ;;;   - singleton success -> drop the follower, continue with current state
 ;;;   - suspended (stream) -> stash (goal . term) in state-F so that later
 ;;;                           triggers can re-run it as more info is learned.
 ;;;
-;;; The `name` is only for human-readable debugging.
-;;; The `term` is carried for future tracing; it has no operational role here.
+;;; The `term` is what the outer search cares about; it's used for
+;;; productivity measurement (walk* term before vs after each trigger)
+;;; and for `*print-follower-term*` tracing.
 
-(define (follower-aux user-name te t ge g)
+(define (follower-aux t g)
   (lambda (st)
     (run-and-set-follower (cons (g 0) t) st)))
 
 (define-syntax follower
   (syntax-rules ()
-    [(_ name te ge)
+    [(_ te ge)
      (let ([t te]
            [g ge])
-       (follower-aux name 'te t 'ge g))]))
+       (follower-aux t g))]))
 
 ;;; --- stream / state shape for conde/d
 ;;; inf/d is a conde/d-style stream: either #f (failure), a state (singleton
@@ -184,7 +222,7 @@
   (or (not v) (and (pair? v) (state? (car v)) (procedure? (cdr v))) (state? v)))
 
 (define (state? v)
-  (and (list? v) (= (length v) 3)))
+  (and (list? v) (= (length v) 5)))
 
 (define-syntax case-inf/d
   (syntax-rules ()
@@ -356,10 +394,34 @@
 (define numbero/d (wrap-for-depth-limit numbero))
 (define stringo/d (wrap-for-depth-limit stringo))
 
+;;; --- main-conde hook
+;;;
+;;; Called by the patched `conde` in mk.scm on every branch entry.
+;;; Responsibilities:
+;;;   1. Bump state-D (main-search depth).  If it exceeds
+;;;      *main-unsound-depth*, fail the branch outright.
+;;;   2. Bump state-FC (follower-check counter).  If FC reaches
+;;;      *check-follower-every*, reset FC to 0 and fire the follower
+;;;      (via trigger-followers).  Otherwise return the state with the
+;;;      bumped FC and no follower fire.
+
+(define (main-conde-hook)
+  (lambda (st)
+    (let ([d^ (+ 1 (state-D st))])
+      (if (> d^ (*main-unsound-depth*))
+          (begin (increment-counter! *main-unsound-depth-cutoff-counter*)
+                 #f)
+          (let ([st (state-with-D st d^)])
+            (let ([fc^ (+ 1 (state-FC st))])
+              (if (>= fc^ (*check-follower-every*))
+                  ((trigger-followers) (state-with-FC st 0))
+                  (state-with-FC st fc^))))))))
+
 ;;; --- follower firing
 
-;; Called by conde and at the end of run.  If the current state has a stored
-;; follower, run it against the state; otherwise pass the state through.
+;; If the current state has a stored follower, run it against the
+;; state; otherwise pass the state through.  Called by main-conde-hook
+;; (throttled) and directly from `run` at end-of-run.
 (define (trigger-followers)
   (lambda (st)
     (let ([F (state-F st)])
@@ -392,10 +454,21 @@
 
 (define (run-and-set-follower F st)
   (let ([g (car F)]
-        [t (cdr F)])
+        [t (cdr F)]
+        [before-walked (walk* (cdr F) (state-S st))])
     (let ([$ ((run-follower-once g t) st)])
       (check-type $ inf/d?)
       (case-inf/d $
         [() #f]
-        [(c^) (state-with-F c^ #f)]
-        [(c^ f^) (state-with-F c^ (cons f^ t))]))))
+        [(c^) (begin
+                (tally-productivity! before-walked t c^)
+                (state-with-F c^ #f))]
+        [(c^ f^) (begin
+                   (tally-productivity! before-walked t c^)
+                   (state-with-F c^ (cons f^ t)))]))))
+
+(define (tally-productivity! before-walked t c^)
+  (let ([after-walked (walk* t (state-S c^))])
+    (if (equal? before-walked after-walked)
+        (increment-counter! *externally-unproductive-trigger-counter*)
+        (increment-counter! *externally-productive-trigger-counter*))))

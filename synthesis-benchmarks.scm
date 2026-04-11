@@ -15,7 +15,7 @@
       (absento '6 q)
       (absento '7 q)
 
-      (follower 'u1 q
+      (follower q
         (fresh/d ()
           ;; ex2
           (evalo/d `(letrec ([append (lambda (l s) : ((list list) -> list)
@@ -87,7 +87,7 @@
       (absento '6 q)
       (absento '7 q)
 
-      (follower 'u1 q
+      (follower q
         (fresh/d ()
           ;; ex1
           (evalo/d `(letrec ([append (lambda (l s) : ((list list) -> list)
@@ -158,7 +158,7 @@
       (absento 6 q)
       (absento 7 q)
 
-      (follower 'u1 q
+      (follower q
         (fresh/d ()
           ;; ex1
           (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
@@ -285,7 +285,7 @@
       (absento 6 q)
       (absento 7 q)
 
-      (follower 'u1 q
+      (follower q
         (fresh/d ()
           ;; ex2
           (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
