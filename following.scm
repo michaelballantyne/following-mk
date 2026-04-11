@@ -47,7 +47,7 @@
 
 (define *unsound-fail-depth* (make-parameter +inf.0))
 
-(define *suspend-depth* (make-parameter 100))
+(define *suspend-depth* (make-parameter 10))
 
 ;;; --- main-search parameters (threaded through the outer state, not
 ;;; the follower's internal search)

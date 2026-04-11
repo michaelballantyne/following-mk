@@ -72,7 +72,7 @@ and `fresh/d`:
   **it can break correctness**.
 - **`*suspend-depth*`** — *sound* cutoff inside the follower. When
   exceeded, the follower suspends (same recovery as genuine incomplete
-  work). Defaults to 100. Lower to make the follower give up more
+  work). Defaults to 10. Lower to make the follower give up more
   readily; raise to let it run deeper before suspending.
 
 Two more parameters govern the *main* miniKanren search (threaded
