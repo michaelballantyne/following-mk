@@ -52,6 +52,11 @@
 (define *determinacy-depth-limit-2*
   (make-parameter 100))
 
+;;; When non-#f, `trigger-followers` prints the reified follower term each
+;;; time it fires, so you can watch synthesis progress through the follower.
+(define *print-follower-term*
+  (make-parameter #f))
+
 ;;; --- counters (cheap instrumentation; print at end of run)
 
 (define *depth-limit-1-cutoff-counter* 0)
@@ -334,7 +339,13 @@
   (lambda (st)
     (let ((F (state-F st)))
       (if F
-          (run-and-set-follower F st)
+          (begin
+            (when (*print-follower-term*)
+              (let ([t (cdr F)])
+                (printf
+                 "~s\n"
+                 ((reify t) (state-with-scope st (new-scope))))))
+            (run-and-set-follower F st))
           st))))
 
 ;; Run a follower (stored as a (g . t) pair), classify the stream, and
