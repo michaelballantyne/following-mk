@@ -26,9 +26,8 @@
     [(_ v pred) v]))
 
 #;(define-syntax check-type
-  (syntax-rules ()
-    [(_ v pred)
-     (check-type-runtime v pred 'pred)]))
+    (syntax-rules ()
+      [(_ v pred) (check-type-runtime v pred 'pred)]))
 
 (define (check-type-runtime v pred pred-e)
   (if (pred v)
@@ -46,27 +45,23 @@
 ;;; suspends (returns the entry state paired with a resume thunk), the same
 ;;; recovery used if the work were genuinely incomplete.
 
-(define *unsound-fail-depth*
-  (make-parameter +inf.0))
+(define *unsound-fail-depth* (make-parameter +inf.0))
 
-(define *suspend-depth*
-  (make-parameter 100))
+(define *suspend-depth* (make-parameter 100))
 
 ;;; When non-#f, `trigger-followers` prints the reified follower term each
 ;;; time it fires, so you can watch synthesis progress through the follower.
-(define *print-follower-term*
-  (make-parameter #f))
+(define *print-follower-term* (make-parameter #f))
 
 ;;; Call this to install a Ctrl-C (SIGINT) handler that dumps the counter
 ;;; snapshot and exits.  Useful for peeking at progress during a
 ;;; non-terminating search.  Opt-in because it replaces chez's default
 ;;; interrupt behavior (reset to REPL), which you want for interactive use.
 (define (install-interrupt-counter-dump!)
-  (keyboard-interrupt-handler
-   (lambda ()
-     (printf "\n--- interrupted; counter snapshot ---\n")
-     (print-counters!)
-     (exit 1))))
+  (keyboard-interrupt-handler (lambda ()
+                                (printf "\n--- interrupted; counter snapshot ---\n")
+                                (print-counters!)
+                                (exit 1))))
 
 ;;; --- counters (cheap instrumentation; print at end of run)
 
@@ -126,30 +121,37 @@
 
 (define-syntax run
   (syntax-rules ()
-    ((_ n (q) g0 g ...)
+    [(_ n (q) g0 g ...)
      (begin
        (reset-counters!)
-       (let ((result
-              (take n
-                    (suspend
-                     ((fresh (q) g0 g ...
-                        (trigger-followers)
-                        (lambda (st)
-                          (let ((st (state-with-scope st nonlocal-scope)))
-                            (let ((z ((reify q) st)))
-                              (cons z (lambda () (lambda () #f)))))))
-                      empty-state)))))
+       (let ([result (take n
+                           (suspend ((fresh (q)
+                                       g0
+                                       g ...
+                                       (trigger-followers)
+                                       (lambda (st)
+                                         (let ([st (state-with-scope st nonlocal-scope)])
+                                           (let ([z ((reify q) st)])
+                                             (cons z
+                                                   (lambda ()
+                                                     (lambda ()
+                                                       #f)))))))
+                                     empty-state)))])
          (print-counters!)
-         result)))
-    ((_ n (q0 q1 q ...) g0 g ...)
+         result))]
+    [(_ n (q0 q1 q ...) g0 g ...)
      (run n (x)
        (fresh (q0 q1 q ...)
-         g0 g ...
-         (== (list q0 q1 q ...) x))))))
+         g0
+         g ...
+         (== (list q0 q1 q ...) x)))]))
 
 (define-syntax run*
   (syntax-rules ()
-    ((_ (q0 q ...) g0 g ...) (run #f (q0 q ...) g0 g ...))))
+    [(_ (q0 q ...) g0 g ...)
+     (run #f (q0 q ...)
+       g0
+       g ...)]))
 
 ;;; --- follower
 ;;;
@@ -170,8 +172,8 @@
 (define-syntax follower
   (syntax-rules ()
     [(_ name te ge)
-     (let ((t te)
-           (g ge))
+     (let ([t te]
+           [g ge])
        (follower-aux name 'te t 'ge g))]))
 
 ;;; --- stream / state shape for conde/d
@@ -179,24 +181,22 @@
 ;;; success), or (state . resume-thunk) (singleton success with remainder).
 
 (define (inf/d? v)
-  (or (not v)
-      (and (pair? v) (state? (car v)) (procedure? (cdr v)))
-      (state? v)))
+  (or (not v) (and (pair? v) (state? (car v)) (procedure? (cdr v))) (state? v)))
 
 (define (state? v)
   (and (list? v) (= (length v) 3)))
 
 (define-syntax case-inf/d
   (syntax-rules ()
-    ((_ e (() e0) ((c^) e2) ((c f) e3))
-     (let ((stream e))
+    [(_ e (() e0) ((c^) e2) ((c f) e3))
+     (let ([stream e])
        (cond
-         ((not stream) e0)
-         ((not (and (pair? stream)
-                 (procedure? (cdr stream))))
-          (let ((c^ stream)) e2))
-         (else (let ((c (car stream)) (f (cdr stream)))
-                 e3)))))))
+         [(not stream) e0]
+         [(not (and (pair? stream) (procedure? (cdr stream)))) (let ([c^ stream]) e2)]
+         [else
+          (let ([c (car stream)]
+                [f (cdr stream)])
+            e3)]))]))
 
 ;;; --- the two depth checks
 
@@ -209,8 +209,9 @@
       (lambda (st)
         (check-type st state?)
         (if (> unsound-fail-depth (*unsound-fail-depth*))
-            (begin (increment-counter! *unsound-fail-depth-cutoff-counter*)
-                   #f) ;; UNSOUND!
+            (begin
+              (increment-counter! *unsound-fail-depth-cutoff-counter*)
+              #f) ;; UNSOUND!
             (((g (+ unsound-fail-depth 1)) suspend-depth) st))))))
 
 ;; Soundly suspend when reaching *suspend-depth*.
@@ -220,100 +221,112 @@
     (lambda (st)
       (check-type st state?)
       (if (> suspend-depth (*suspend-depth*))
-          (begin (increment-counter! *suspend-depth-cutoff-counter*)
-                 (cons st (g-on-fallback-thunk)))
+          (begin
+            (increment-counter! *suspend-depth-cutoff-counter*)
+            (cons st (g-on-fallback-thunk)))
           ((g (+ suspend-depth 1)) st)))))
 
 ;;; --- conde/d: committing conde
 
-(define-syntax (conde/d stx)
+(define-syntax (conde/d
+                 stx)
   (syntax-case stx ()
-    ((_ ((x ...) (g ...) (b ...)) ...)
+    [(_ ((x ...) (g ...) (b ...)) ...)
      #`(check-unsound-fail-depth
         (lambda (unsound-fail-depth)
           (check-type unsound-fail-depth number?)
-          (letrec ([conde/d-g (conde/d-runtime
-                             (list
-                              (lambda (suspend-depth)
-                                (check-type suspend-depth number?)
-                                (lambda (st)
-                                  (check-type st state?)
-                                  (let ([scope (subst-scope (state-S st))])
-                                    (let ([x (var scope)] ...)
-                                      (cons
-                                       (bind/d* st ((g unsound-fail-depth) suspend-depth) ...)
-                                       (lambda (suspend-depth)
-                                         (check-type suspend-depth number?)
-                                         (lambda (st) (bind/d* st ((b unsound-fail-depth) suspend-depth) ...))))))))
-                              ...)
-                             (lambda () conde/d-g))])
-            conde/d-g))))))
+          (letrec ([conde/d-g
+                    (conde/d-runtime
+                     (list (lambda (suspend-depth)
+                             (check-type suspend-depth number?)
+                             (lambda (st)
+                               (check-type st state?)
+                               (let ([scope (subst-scope (state-S st))])
+                                 (let ([x (var scope)] ...)
+                                   (cons (bind/d* st ((g unsound-fail-depth) suspend-depth) ...)
+                                         (lambda (suspend-depth)
+                                           (check-type suspend-depth number?)
+                                           (lambda (st)
+                                             (bind/d* st
+                                                      ((b unsound-fail-depth) suspend-depth)
+                                                      ...)))))))) ...)
+                     (lambda ()
+                       conde/d-g))])
+            conde/d-g)))]))
 
 (define (conde/d-runtime clauses g-thunk)
-  (check-suspend-depth g-thunk
-    (lambda (suspend-depth)
-      (check-type suspend-depth number?)
-      (lambda (st)
-        (define (nondeterministic) (check-type (cons st (g-thunk)) inf/d?))
-        (check-type st state?)
-        (let ((st (state-with-scope st (new-scope)))) ;; for set-var-val at choice point entry
-          (let loop ([clauses clauses] [previously-found-clause #f])
-            (if (null? clauses)
-                (and previously-found-clause
-                     (let ([guard-result (car previously-found-clause)]
-                           [body (cdr previously-found-clause)])
-                       ;; commit, evaluate body
-                       ((body suspend-depth) guard-result)))
-                (let* ([clause-evaluated (((car clauses) suspend-depth) st)]
-                       [guard-stream (car clause-evaluated)]
-                       [body-g (cdr clause-evaluated)])
-                  (let ([guard-result (evaluate-guard guard-stream body-g)])
-                    (cond
-                      [(not guard-result) (loop (cdr clauses) previously-found-clause)]
-                      [(eq? 'nondet guard-result) (nondeterministic)]
-                      [else (if previously-found-clause
-                                (nondeterministic)
-                                (loop (cdr clauses) guard-result))]))))))))))
+  (check-suspend-depth
+   g-thunk
+   (lambda (suspend-depth)
+     (check-type suspend-depth number?)
+     (lambda (st)
+       (define (nondeterministic)
+         (check-type (cons st (g-thunk)) inf/d?))
+       (check-type st state?)
+       (let ([st (state-with-scope st (new-scope))]) ;; for set-var-val at choice point entry
+         (let loop ([clauses clauses]
+                    [previously-found-clause #f])
+           (if (null? clauses)
+               (and previously-found-clause
+                    (let ([guard-result (car previously-found-clause)]
+                          [body (cdr previously-found-clause)])
+                      ;; commit, evaluate body
+                      ((body suspend-depth) guard-result)))
+               (let* ([clause-evaluated (((car clauses) suspend-depth) st)]
+                      [guard-stream (car clause-evaluated)]
+                      [body-g (cdr clause-evaluated)])
+                 (let ([guard-result (evaluate-guard guard-stream body-g)])
+                   (cond
+                     [(not guard-result) (loop (cdr clauses) previously-found-clause)]
+                     [(eq? 'nondet guard-result) (nondeterministic)]
+                     [else
+                      (if previously-found-clause
+                          (nondeterministic)
+                          (loop (cdr clauses) guard-result))]))))))))))
 
 (define (evaluate-guard stream body-g)
   (case-inf/d stream
-    (() #f)
-    ((c) (cons c body-g))
-    ((c f) 'nondet)))
+    [() #f]
+    [(c) (cons c body-g)]
+    [(c f) 'nondet]))
 
 ;;; --- bind/d / fresh/d / depth-threaded goal primitives
 
 (define (bind/d stream g)
   (check-type stream inf/d?)
-  (check-type
-   (case-inf/d stream
-     (() #f)
-     ((c) (g c))   ;; committed and finished, so just g left to do
-     ((c1 f1)      ;; committed but suspended...
-      (let ([s2 (g c1)])
-        (case-inf/d s2
-          (() #f)              ;; g fails, so whole thing fails
-          ((c2) (cons c2 f1))  ;; committed and finished, so just f1 to return to
-          ;; when we return we need to do both f1 and f2
-          ((c2 f2) (cons c2 (lambda (suspend-depth) (lambda (st) (bind/d ((f1 suspend-depth) st) (f2 suspend-depth))))))))))
-   inf/d?))
+  (check-type (case-inf/d stream
+                [() #f]
+                [(c) (g c)] ;; committed and finished, so just g left to do
+                [(c1 f1) ;; committed but suspended...
+                 (let ([s2 (g c1)])
+                   (case-inf/d s2
+                     [() #f] ;; g fails, so whole thing fails
+                     [(c2) (cons c2 f1)] ;; committed and finished, so just f1 to return to
+                     ;; when we return we need to do both f1 and f2
+                     [(c2 f2)
+                      (cons c2
+                            (lambda (suspend-depth)
+                              (lambda (st)
+                                (bind/d ((f1 suspend-depth) st) (f2 suspend-depth)))))]))])
+              inf/d?))
 
 (define-syntax bind/d*
   (syntax-rules ()
-    ((_ e) e)
-    ((_ e g0 g ...) (bind/d* (bind/d e g0) g ...))))
+    [(_ e) e]
+    [(_ e g0 g ...) (bind/d* (bind/d e g0) g ...)]))
 
 (define-syntax fresh/d
   (syntax-rules ()
-    ((_ (x ...) g0 g ...)
+    [(_ (x ...) g0 g ...)
      (lambda (unsound-fail-depth)
        (check-type unsound-fail-depth number?)
        (lambda (suspend-depth)
          (check-type suspend-depth number?)
          (lambda (st)
-           (let ((scope (subst-scope (state-S st))))
-             (let ((x (var scope)) ...)
-               (bind/d* (((g0 unsound-fail-depth) suspend-depth) st) ((g unsound-fail-depth) suspend-depth) ...)))))))))
+           (let ([scope (subst-scope (state-S st))])
+             (let ([x (var scope)] ...)
+               (bind/d* (((g0 unsound-fail-depth) suspend-depth) st)
+                        ((g unsound-fail-depth) suspend-depth) ...))))))]))
 
 ;;; --- depth-threading wrappers for the primitive goal constructors used
 ;;; inside conde/d / fresh/d.  Each /d variant takes the same args as its base
@@ -336,8 +349,8 @@
     (increment-counter! *==/d-counter*)
     ((==-base u v) st)))
 
-(define ==/d      (wrap-for-depth-limit ==-counted))
-(define =/=/d     (wrap-for-depth-limit =/=))
+(define ==/d (wrap-for-depth-limit ==-counted))
+(define =/=/d (wrap-for-depth-limit =/=))
 (define absento/d (wrap-for-depth-limit absento))
 (define symbolo/d (wrap-for-depth-limit symbolo))
 (define numbero/d (wrap-for-depth-limit numbero))
@@ -349,14 +362,11 @@
 ;; follower, run it against the state; otherwise pass the state through.
 (define (trigger-followers)
   (lambda (st)
-    (let ((F (state-F st)))
+    (let ([F (state-F st)])
       (if F
           (begin
             (when (*print-follower-term*)
-              (let ([t (cdr F)])
-                (printf
-                 "~s\n"
-                 ((reify t) (state-with-scope st (new-scope))))))
+              (let ([t (cdr F)]) (printf "~s\n" ((reify t) (state-with-scope st (new-scope))))))
             (run-and-set-follower F st))
           st))))
 
@@ -364,13 +374,21 @@
 ;; store the (possibly-updated) resume thunk back on the state.
 (define (run-follower-once g t)
   (lambda (st)
-    (let ((st (state-with-scope st (new-scope))))
+    (let ([st (state-with-scope st (new-scope))])
       (let ([$ ((g 0) st)])
         (case-inf/d $
-          (() (begin (increment-counter! *fail-counter*) #f))
-          ((c) (begin (increment-counter! *singleton-succeed-counter*) c))
-          ((c f^) (begin (increment-counter! *non-singleton-succeed-counter*)
-                         (cons c f^))))))))
+          [()
+           (begin
+             (increment-counter! *fail-counter*)
+             #f)]
+          [(c)
+           (begin
+             (increment-counter! *singleton-succeed-counter*)
+             c)]
+          [(c f^)
+           (begin
+             (increment-counter! *non-singleton-succeed-counter*)
+             (cons c f^))])))))
 
 (define (run-and-set-follower F st)
   (let ([g (car F)]
@@ -378,6 +396,6 @@
     (let ([$ ((run-follower-once g t) st)])
       (check-type $ inf/d?)
       (case-inf/d $
-        (() #f)
-        ((c^) (state-with-F c^ #f))
-        ((c^ f^) (state-with-F c^ (cons f^ t)))))))
+        [() #f]
+        [(c^) (state-with-F c^ #f)]
+        [(c^ f^) (state-with-F c^ (cons f^ t))]))))

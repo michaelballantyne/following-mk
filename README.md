@@ -51,6 +51,10 @@ guards succeed singleton-style. If guards of multiple clauses succeed, or
 any guard has residual nondeterminism, the whole `conde/d` stalls rather
 than branches.
 
+"Singleton" here means the guard produces *one* result state — it's fine
+for the guard to unify variables, add disequalities, or pin types along
+the way. Those extensions travel with the commit.
+
 `restricted-interp-following.scm` has a worked example: a relational
 interpreter written entirely in `/d` goals, so it can run inside a follower
 and evaluate a partial program forward wherever determinacy allows.
