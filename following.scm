@@ -35,21 +35,21 @@
       v
       (error 'check-type (format "expected ~s, got ~s" pred-e v))))
 
-;;; --- depth-limit parameters
+;;; --- depth parameters
 ;;;
-;;; *determinacy-depth-limit-1*: UNSOUND cutoff.  When exceeded, the
+;;; *unsound-fail-depth*: UNSOUND cutoff.  When exceeded, the
 ;;; follower fails outright.  Intended as a diagnostic knob so that a
 ;;; diverging branch can be starved out of faster-mk's interleaving scheduler,
 ;;; making pruning on the surviving branch observable.  NOT a real optimization.
 ;;;
-;;; *determinacy-depth-limit-2*: sound cutoff.  When exceeded, the follower
+;;; *suspend-depth*: sound cutoff.  When exceeded, the follower
 ;;; suspends (returns the entry state paired with a resume thunk), the same
 ;;; recovery used if the work were genuinely incomplete.
 
-(define *determinacy-depth-limit-1*
-  (make-parameter 100000000000))
+(define *unsound-fail-depth*
+  (make-parameter +inf.0))
 
-(define *determinacy-depth-limit-2*
+(define *suspend-depth*
   (make-parameter 100))
 
 ;;; When non-#f, `trigger-followers` prints the reified follower term each
@@ -57,10 +57,21 @@
 (define *print-follower-term*
   (make-parameter #f))
 
+;;; Call this to install a Ctrl-C (SIGINT) handler that dumps the counter
+;;; snapshot and exits.  Useful for peeking at progress during a
+;;; non-terminating search.  Opt-in because it replaces chez's default
+;;; interrupt behavior (reset to REPL), which you want for interactive use.
+(define (install-interrupt-counter-dump!)
+  (keyboard-interrupt-handler
+   (lambda ()
+     (printf "\n--- interrupted; counter snapshot ---\n")
+     (print-counters!)
+     (exit 1))))
+
 ;;; --- counters (cheap instrumentation; print at end of run)
 
-(define *depth-limit-1-cutoff-counter* 0)
-(define *depth-limit-2-cutoff-counter* 0)
+(define *unsound-fail-depth-cutoff-counter* 0)
+(define *suspend-depth-cutoff-counter* 0)
 (define *==-counter* 0)
 (define *==/d-counter* 0)
 (define *fail-counter* 0)
@@ -73,8 +84,8 @@
     [(_ c) (set! c (add1 c))]))
 
 (define (reset-counters!)
-  (set! *depth-limit-1-cutoff-counter* 0)
-  (set! *depth-limit-2-cutoff-counter* 0)
+  (set! *unsound-fail-depth-cutoff-counter* 0)
+  (set! *suspend-depth-cutoff-counter* 0)
   (set! *==-counter* 0)
   (set! *==/d-counter* 0)
   (set! *fail-counter* 0)
@@ -83,8 +94,8 @@
   (set! *user-counter* 0))
 
 (define (print-counters!)
-  (printf "*depth-limit-1-cutoff-counter*: ~s\n" *depth-limit-1-cutoff-counter*)
-  (printf "*depth-limit-2-cutoff-counter*: ~s\n" *depth-limit-2-cutoff-counter*)
+  (printf "*unsound-fail-depth-cutoff-counter*: ~s\n" *unsound-fail-depth-cutoff-counter*)
+  (printf "*suspend-depth-cutoff-counter*: ~s\n" *suspend-depth-cutoff-counter*)
   (printf "*==-counter*: ~s\n" *==-counter*)
   (printf "*==/d-counter*: ~s\n" *==/d-counter*)
   (printf "*fail-counter*: ~s\n" *fail-counter*)
@@ -187,61 +198,61 @@
          (else (let ((c (car stream)) (f (cdr stream)))
                  e3)))))))
 
-;;; --- the two depth limits
+;;; --- the two depth checks
 
-;; Unsoundly fail when reaching depth-1 limit.
-(define (check-depth-1 g)
-  (lambda (depth1)
-    (check-type depth1 number?)
-    (lambda (depth2)
-      (check-type depth2 number?)
+;; Unsoundly fail when reaching *unsound-fail-depth*.
+(define (check-unsound-fail-depth g)
+  (lambda (unsound-fail-depth)
+    (check-type unsound-fail-depth number?)
+    (lambda (suspend-depth)
+      (check-type suspend-depth number?)
       (lambda (st)
         (check-type st state?)
-        (if (> depth1 (*determinacy-depth-limit-1*))
-            (begin (increment-counter! *depth-limit-1-cutoff-counter*)
+        (if (> unsound-fail-depth (*unsound-fail-depth*))
+            (begin (increment-counter! *unsound-fail-depth-cutoff-counter*)
                    #f) ;; UNSOUND!
-            (((g (+ depth1 1)) depth2) st))))))
+            (((g (+ unsound-fail-depth 1)) suspend-depth) st))))))
 
-;; Soundly suspend when reaching depth-2 limit.
-(define (check-depth-2 g-on-fallback-thunk g)
-  (lambda (depth2)
-    (check-type depth2 number?)
+;; Soundly suspend when reaching *suspend-depth*.
+(define (check-suspend-depth g-on-fallback-thunk g)
+  (lambda (suspend-depth)
+    (check-type suspend-depth number?)
     (lambda (st)
       (check-type st state?)
-      (if (> depth2 (*determinacy-depth-limit-2*))
-          (begin (increment-counter! *depth-limit-2-cutoff-counter*)
+      (if (> suspend-depth (*suspend-depth*))
+          (begin (increment-counter! *suspend-depth-cutoff-counter*)
                  (cons st (g-on-fallback-thunk)))
-          ((g (+ depth2 1)) st)))))
+          ((g (+ suspend-depth 1)) st)))))
 
 ;;; --- conde/d: committing conde
 
 (define-syntax (conde/d stx)
   (syntax-case stx ()
     ((_ ((x ...) (g ...) (b ...)) ...)
-     #`(check-depth-1
-        (lambda (depth1)
-          (check-type depth1 number?)
+     #`(check-unsound-fail-depth
+        (lambda (unsound-fail-depth)
+          (check-type unsound-fail-depth number?)
           (letrec ([conde/d-g (conde/d-runtime
                              (list
-                              (lambda (depth2)
-                                (check-type depth2 number?)
+                              (lambda (suspend-depth)
+                                (check-type suspend-depth number?)
                                 (lambda (st)
                                   (check-type st state?)
                                   (let ([scope (subst-scope (state-S st))])
                                     (let ([x (var scope)] ...)
                                       (cons
-                                       (bind/d* st ((g depth1) depth2) ...)
-                                       (lambda (depth2)
-                                         (check-type depth2 number?)
-                                         (lambda (st) (bind/d* st ((b depth1) depth2) ...))))))))
+                                       (bind/d* st ((g unsound-fail-depth) suspend-depth) ...)
+                                       (lambda (suspend-depth)
+                                         (check-type suspend-depth number?)
+                                         (lambda (st) (bind/d* st ((b unsound-fail-depth) suspend-depth) ...))))))))
                               ...)
                              (lambda () conde/d-g))])
             conde/d-g))))))
 
 (define (conde/d-runtime clauses g-thunk)
-  (check-depth-2 g-thunk
-    (lambda (depth2)
-      (check-type depth2 number?)
+  (check-suspend-depth g-thunk
+    (lambda (suspend-depth)
+      (check-type suspend-depth number?)
       (lambda (st)
         (define (nondeterministic) (check-type (cons st (g-thunk)) inf/d?))
         (check-type st state?)
@@ -252,8 +263,8 @@
                      (let ([guard-result (car previously-found-clause)]
                            [body (cdr previously-found-clause)])
                        ;; commit, evaluate body
-                       ((body depth2) guard-result)))
-                (let* ([clause-evaluated (((car clauses) depth2) st)]
+                       ((body suspend-depth) guard-result)))
+                (let* ([clause-evaluated (((car clauses) suspend-depth) st)]
                        [guard-stream (car clause-evaluated)]
                        [body-g (cdr clause-evaluated)])
                   (let ([guard-result (evaluate-guard guard-stream body-g)])
@@ -284,7 +295,7 @@
           (() #f)              ;; g fails, so whole thing fails
           ((c2) (cons c2 f1))  ;; committed and finished, so just f1 to return to
           ;; when we return we need to do both f1 and f2
-          ((c2 f2) (cons c2 (lambda (depth2) (lambda (st) (bind/d ((f1 depth2) st) (f2 depth2))))))))))
+          ((c2 f2) (cons c2 (lambda (suspend-depth) (lambda (st) (bind/d ((f1 suspend-depth) st) (f2 suspend-depth))))))))))
    inf/d?))
 
 (define-syntax bind/d*
@@ -295,26 +306,27 @@
 (define-syntax fresh/d
   (syntax-rules ()
     ((_ (x ...) g0 g ...)
-     (lambda (depth1)
-       (check-type depth1 number?)
-       (lambda (depth2)
-         (check-type depth2 number?)
+     (lambda (unsound-fail-depth)
+       (check-type unsound-fail-depth number?)
+       (lambda (suspend-depth)
+         (check-type suspend-depth number?)
          (lambda (st)
            (let ((scope (subst-scope (state-S st))))
              (let ((x (var scope)) ...)
-               (bind/d* (((g0 depth1) depth2) st) ((g depth1) depth2) ...)))))))))
+               (bind/d* (((g0 unsound-fail-depth) suspend-depth) st) ((g unsound-fail-depth) suspend-depth) ...)))))))))
 
-;;; --- depth-limit wrappers for the primitive goal constructors used inside
-;;; conde/d / fresh/d.  Each /g variant takes the same args as its base but
-;;; returns a goal that accepts (depth1)(depth2)(st) thunks.
+;;; --- depth-threading wrappers for the primitive goal constructors used
+;;; inside conde/d / fresh/d.  Each /d variant takes the same args as its base
+;;; but returns a goal that accepts (unsound-fail-depth)(suspend-depth)(st)
+;;; thunks.
 
 (define (wrap-for-depth-limit gc)
   (lambda args
     (let ([g (apply gc args)])
-      (lambda (depth1)
-        (check-type depth1 number?)
-        (lambda (depth2)
-          (check-type depth2 number?)
+      (lambda (unsound-fail-depth)
+        (check-type unsound-fail-depth number?)
+        (lambda (suspend-depth)
+          (check-type suspend-depth number?)
           g)))))
 
 ;; A counted == variant used as the base for ==/d, so we can tell unifications

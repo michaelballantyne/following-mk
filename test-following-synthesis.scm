@@ -3,14 +3,6 @@
 ;; yet.  Start with test-following.scm for sanity tests; come here to poke at
 ;; the open problems.
 
-(load "load.scm")
-(load "restricted-interp.scm")
-(load "restricted-interp-following.scm")
-
-(*determinacy-depth-limit-1* 1000000)
-(*determinacy-depth-limit-2* 20)
-(*print-follower-term* #t)
-
 (time (test "synthesize append with follower swapped"
             (run 1 (q)
               (absento '3 q)

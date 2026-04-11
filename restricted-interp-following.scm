@@ -4,6 +4,14 @@
 
 (define empty-env/d '())
 
+(define (not-in-envo/d x env)
+  (conde/d
+   ([] [(==/d empty-env/d env)] [])
+   ([y b rest]
+    [(==/d `((,y . ,b) . ,rest) env)
+     (=/=/d y x)]
+    [(not-in-envo/d x rest)])))
+
 (define (lookupo/d x env t type)
   (fresh/d (y b rest)
     (==/d `((,y . ,b) . ,rest) env)
@@ -55,12 +63,14 @@
    ([] [(==/d EI 'I)
         (==/d type 'list)
         (==/d '(quote ()) expr)
-        (==/d '() val)] [])
+        (==/d '() val)
+        (not-in-envo/d 'quote env)] [])
    ([e1 e2 v1 v2]
     [(==/d EI 'I)
      (==/d type 'list)
      (==/d `(cons ,e1 ,e2) expr)
-     (==/d `(,v1 . ,v2) val)] 
+     (==/d `(,v1 . ,v2) val)
+     (not-in-envo/d 'cons env)]
     [(eval-expo/d e1 env v1 'I 'number)
      (eval-expo/d e2 env v2 'I 'list)])
    ([rator x* rands body env^ a* at* res]
@@ -76,7 +86,8 @@
     [(==/d EI 'I)
      (==/d `(letrec ((,p-name (lambda ,x : ,ftype ,body)))
             ,letrec-body)
-         expr)]
+         expr)
+     (not-in-envo/d 'letrec env)]
     [(list-of-symbolso/d x)
      (eval-expo/d letrec-body
                   `((,p-name . (rec ,ftype . (lambda ,x ,body))) . ,env)
@@ -87,7 +98,8 @@
             ('() ,e2)
             ((cons ,s1 ,s2) ,e3)) expr)
      (symbolo/d s1)
-     (symbolo/d s2)] 
+     (symbolo/d s2)
+     (not-in-envo/d 'match env)]
     [(eval-expo/d e1 env v1 'E 'list)
      (conde/d
       ([] [(==/d '() v1)] [(eval-expo/d e2 env val 'I type)])
@@ -99,7 +111,8 @@
     [(==/d EI 'I)
      (==/d `(if (= ,e1 ,e2)
               ,e3
-              ,e4) expr)] 
+              ,e4) expr)
+     (not-in-envo/d 'if env)]
     [(eval-expo/d e1 env v1 'E 'number)
      (eval-expo/d e2 env v2 'E 'number)
      (conde/d
