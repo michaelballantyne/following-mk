@@ -169,20 +169,25 @@
 ; Contains:
 ;   S - the substitution
 ;   C - the constraint store
+;   F - follower cell (#f or (goal . term)), used by following.scm
 
-(define (state S C) (cons S C))
+(define (state S C F) (list S C F))
 
 (define (state-S st) (car st))
-(define (state-C st) (cdr st))
+(define (state-C st) (cadr st))
+(define (state-F st) (caddr st))
 
-(define empty-state (state empty-subst empty-C))
+(define empty-state (state empty-subst empty-C #f))
 
 (define (state-with-C st C^)
-  (state (state-S st) C^))
+  (state (state-S st) C^ (state-F st)))
+
+(define (state-with-F st F^)
+  (state (state-S st) (state-C st) F^))
 
 (define state-with-scope
   (lambda (st new-scope)
-    (state (subst-with-scope (state-S st) new-scope) (state-C st))))
+    (state (subst-with-scope (state-S st) new-scope) (state-C st) (state-F st))))
 
 ; Unification
 
@@ -333,15 +338,20 @@
              (bind* (g0 st) g ...))))))))
 
 ; (conde [g:Goal ...] ...+) -> Goal
+; Before branching, give any stored follower a chance to fire on the
+; current state (trigger-followers is defined in following.scm).
 (define-syntax conde
   (syntax-rules ()
     ((_ (g0 g ...) (g1 g^ ...) ...)
      (lambda (st)
-       (suspend
-         (let ((st (state-with-scope st (new-scope))))
-           (mplus*
-             (bind* (g0 st) g ...)
-             (bind* (g1 st) g^ ...) ...)))))))
+       (bind
+        ((trigger-followers) st)
+        (lambda (st)
+          (suspend
+            (let ((st (state-with-scope st (new-scope))))
+              (mplus*
+                (bind* (g0 st) g ...)
+                (bind* (g1 st) g^ ...) ...)))))))))
 
 (define-syntax run
   (syntax-rules ()
@@ -504,7 +514,7 @@
   (lambda (st)
     (let-values (((S^ added) (unify u v (state-S st))))
       (if S^
-        (and-foldl update-constraints (state S^ (state-C st)) added)
+        (and-foldl update-constraints (state S^ (state-C st) (state-F st)) added)
         #f))))
 
 ; Not fully optimized. Could do absento update with fewer
