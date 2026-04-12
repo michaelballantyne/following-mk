@@ -330,9 +330,10 @@
   (not
    (and (eq? (state-C st) (state-C st^))
         (eq? (subst-map (state-S st))
-             (subst-map (state-S st))))))
+             (subst-map (state-S st^))))))
 
 (define (bind/d suspend-depth stream g2)
+  (printf "~a\n" suspend-depth)
   (case-inf/d stream
               [() #f]
               [(c) (g2 c)] ;; committed and finished, so just g left to do
@@ -342,12 +343,12 @@
                              [() #f] ;; g2 fails, so whole thing fails
                              [(c2)
                               (if (changed-state? c1 c2)
-                                  ((f1 suspend-depth) c2)  ;; finished and made progress, go back to f1 from g1
+                                  ((f1 (+ 1 suspend-depth)) c2)  ;; finished and made progress, go back to f1 from g1
                                   (cons c2 f1))] ;; finshed without meaningful change, so we are nondet
                              ;; when we return we need to do both f1 and f2
                              [(c2 f2)
                               (if (changed-state? c1 c2)
-                                  (bind/d suspend-depth ((f1 suspend-depth) c2) (f2 suspend-depth)) ;; made progress, go back to f1 from g1 and come back later
+                                  (bind/d (+ 1 suspend-depth) ((f1 (+ 1 suspend-depth)) c2) (f2 (+ 1 suspend-depth))) ;; made progress, go back to f1 from g1 and come back later
                                   (cons c2
                                         (lambda (suspend-depth)
                                           (lambda (st)
