@@ -368,3 +368,44 @@
                           (rember 5 (cons 3 (cons 4 (cons 6 (cons 7 '()))))))
                        v4)))))
       '((() () (3 4 6) (3 4 6 7))))))
+
+;; Two adjacent conjuncts that each diverge (r/d recurses infinitely).
+;; Without the depth limit and hard-suspend mechanism, the conjunction
+;; bounces back and forth between the two r/d calls forever: each
+;; iteration creates fresh variables and extends the substitution map,
+;; so the change-detection sees "progress" on every pass. The depth
+;; limit causes each r/d to hard-suspend, which bind/d cannot bounce
+;; through, so the conjunction terminates and the follower commits
+;; q = 1 from the other clause.
+(define (r)
+  (conde
+    [(fresh (x)
+       (== x 1)
+       (r))]))
+
+(define (r/d)
+  (conde/d
+    [[x]
+     [(==/d x 1)]
+     [(r/d)]]))
+
+(test "diverging conjuncts terminate via hard-suspend"
+  (run 1 (q)
+    (follower q
+              (conde/d
+                [[]
+                 [(==/d q 1)]
+                 []]
+                [[]
+                 [(==/d q 2)
+                  (fresh/d ()
+                           (r/d)
+                           (r/d))]
+                 []]))
+    (conde
+      [(== q 1)]
+      [(fresh ()
+         (== q 2)
+         (r)
+         (r))]))
+  '(1))

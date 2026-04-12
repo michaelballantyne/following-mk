@@ -216,23 +216,33 @@
 ;;; inf/d is a conde/d-style stream: either #f (failure), a state (singleton
 ;;; success), or (state . resume-thunk) (singleton success with remainder).
 
-(define (inf/d? v)
-  (or (not v) (and (pair? v) (state? (car v)) (procedure? (cdr v))) (state? v)))
-
 (define (state? v)
   (and (list? v) (= (length v) 5)))
 
+(define-record-type hard-suspended (fields state thunk))
+
+(define (inf/d? v)
+  (or (not v)
+      (hard-suspended? v)
+      (and (pair? v) (state? (car v)) (procedure? (cdr v)))
+      (state? v)))
+
 (define-syntax case-inf/d
   (syntax-rules ()
-    [(_ e (() e0) ((c^) e2) ((c f) e3))
+    [(_ e (() e0) ((c^) e1) ((c f) e2) ((ch fh) e3))
      (let ([stream e])
        (cond
          [(not stream) e0]
-         [(not (and (pair? stream) (procedure? (cdr stream)))) (let ([c^ stream]) e2)]
+         [(hard-suspended? stream)
+          (let ([ch (hard-suspended-state stream)]
+                [fh (hard-suspended-thunk stream)])
+            e3)]
+         [(not (and (pair? stream) (procedure? (cdr stream))))
+          (let ([c^ stream]) e1)]
          [else
           (let ([c (car stream)]
                 [f (cdr stream)])
-            e3)]))]))
+            e2)]))]))
 
 ;;; --- the two depth checks
 
@@ -259,7 +269,7 @@
       (if (> suspend-depth (*suspend-depth*))
           (begin
             (increment-counter! *suspend-depth-cutoff-counter*)
-            (cons st (g-on-fallback-thunk)))
+            (make-hard-suspended st (g-on-fallback-thunk)))
           ((g (+ suspend-depth 1)) st)))))
 
 ;;; --- conde/d: committing conde
@@ -302,78 +312,92 @@
                     [previously-found-clause #f])
            (if (null? clauses)
                (and previously-found-clause
-                    (let ([guard-result (car previously-found-clause)]
+                    (let ([guard-stream (car previously-found-clause)]
                           [body (cdr previously-found-clause)])
                       ;; commit, evaluate body
-                      ((body suspend-depth) guard-result)))
+                      (case-inf/d guard-stream
+                        [() #f]
+                        [(c) (conj/d-run suspend-depth (list (body suspend-depth)) c '() '())]
+                        [(c f)
+                         (conj/d-run suspend-depth (list (body suspend-depth)) c (list f) '())]
+                        [(ch fh)
+                         (conj/d-run suspend-depth (list (body suspend-depth)) ch '() (list fh))])))
                (let* ([clause-evaluated (((car clauses) suspend-depth) st)]
                       [guard-stream (car clause-evaluated)]
                       [body-g (cdr clause-evaluated)])
-                 (let ([guard-result (evaluate-guard guard-stream body-g)])
-                   (cond
-                     [(not guard-result) (loop (cdr clauses) previously-found-clause)]
-                     [(eq? 'nondet guard-result) (nondeterministic)]
-                     [else
-                      (if previously-found-clause
-                          (nondeterministic)
-                          (loop (cdr clauses) guard-result))]))))))))))
+                 (cond
+                   [(not guard-stream) (loop (cdr clauses) previously-found-clause)]
+                   [else
+                    (if previously-found-clause
+                        (nondeterministic)
+                        (loop (cdr clauses) (cons guard-stream body-g)))])))))))))
 
-(define (evaluate-guard stream body-g)
-  (case-inf/d stream
-    [() #f]
-    [(c) (cons c body-g)]
-    [(c f) 'nondet]))
 
-;;; --- bind/d / fresh/d / depth-threaded goal primitives
+;;; --- conjunction / depth-threaded goal primitives
 
-(define (changed-state? st st^)
-  (not
-   (and (eq? (state-C st) (state-C st^))
-        (eq? (subst-map (state-S st))
-             (subst-map (state-S st^))))))
+;;; conj/d-run: worklist-based conjunction runner.
+;;; Takes a suspend-depth, a list of goals [(st -> inf/d) ...], and
+;;; a state. Processes each goal, collecting results into soft-suspended
+;;; (can retry with new info) and hard-suspended (deferred to retrigger)
+;;; worklists. Iterates on soft-suspended goals while progress is made.
 
-(define (bind/d suspend-depth stream g2)
-  (printf "~a\n" suspend-depth)
-  (case-inf/d stream
+(define (conj/d-run suspend-depth goals st soft hard)
+  (let ([entry-C (state-C st)]
+        [entry-M (subst-map (state-S st))])
+    (let process ([goals goals]
+                  [st st]
+                  [soft soft]
+                  [hard hard])
+      (if (null? goals)
+          ;; Round complete.
+          (let ([changed? (or (not (eq? entry-C (state-C st)))
+                              (not (eq? entry-M (subst-map (state-S st)))))])
+            (cond
+              [(and (null? soft) (null? hard))
+               st]
+              [(and (not (null? soft)) changed?)
+               ;; Progress was made — iterate on soft-suspended goals.
+               (conj/d-run (+ 1 suspend-depth)
+                           (map (lambda (f) (f (+ 1 suspend-depth))) (reverse soft))
+                           st '() hard)]
+              [else
+               ;; No more progress. Build result from remaining goals.
+               (let ([resume (conj/d-resume (reverse soft) hard)])
+                 (if (null? hard)
+                     (cons st resume)
+                     (make-hard-suspended st resume)))]))
+          ;; Process next goal.
+          (let ([result ((car goals) st)])
+            (case-inf/d result
               [() #f]
-              [(c) (g2 c)] ;; committed and finished, so just g left to do
-              [(c1 f1) ;; committed but suspended...
-               (let ([s2 (g2 (state-with-scope c1 (new-scope)))])
-                 (case-inf/d s2
-                             [() #f] ;; g2 fails, so whole thing fails
-                             [(c2)
-                              (if (changed-state? c1 c2)
-                                  ((f1 (+ 1 suspend-depth)) c2)  ;; finished and made progress, go back to f1 from g1
-                                  (cons c2 f1))] ;; finshed without meaningful change, so we are nondet
-                             ;; when we return we need to do both f1 and f2
-                             [(c2 f2)
-                              (if (changed-state? c1 c2)
-                                  (bind/d (+ 1 suspend-depth) ((f1 (+ 1 suspend-depth)) c2) (f2 (+ 1 suspend-depth))) ;; made progress, go back to f1 from g1 and come back later
-                                  (cons c2
-                                        (lambda (suspend-depth)
-                                          (lambda (st)
-                                            (bind/d suspend-depth ((f1 suspend-depth) st) (f2 suspend-depth))))))]))]))
+              [(c) (process (cdr goals) c soft hard)]
+              [(c f) (process (cdr goals) c (cons f soft) hard)]
+              [(ch fh) (process (cdr goals) ch soft (cons fh hard))]))))))
 
-(define (conj/d g1 g2)
-  (lambda (unsound-fail-depth)
-    (check-type unsound-fail-depth number?)
-    (lambda (suspend-depth)
-      (check-type suspend-depth number?)
+(define (conj/d-resume soft hard)
+  (let ([all (append soft hard)])
+    (lambda (sd)
       (lambda (st)
-        (let ([stream (((g1 unsound-fail-depth) suspend-depth) st)])
-          (check-type stream inf/d?)
-          (bind/d suspend-depth stream ((g2 unsound-fail-depth) suspend-depth)))))))
+        (conj/d-run sd (map (lambda (f) (f sd)) all) st '() '())))))
+
 
 (define succeed/d
   (lambda (unsound-fail-depth)
-    (lambda (stream)
+    (lambda (suspend-depth)
       (lambda (st) st))))
 
 (define-syntax conj/d*
   (syntax-rules ()
     [(_) succeed/d]
     [(_ g0) g0]
-    [(_ g0 g1 g ...) (conj/d* (conj/d g0 g1) g ...)]))
+    [(_ g0 g1 g* ...)
+     (let ([gs (list g0 g1 g* ...)])
+       (lambda (unsound-fail-depth)
+         (lambda (suspend-depth)
+           (lambda (st)
+             (conj/d-run suspend-depth
+                         (map (lambda (g) ((g unsound-fail-depth) suspend-depth)) gs)
+                         st '() '())))))]))
 
 (define-syntax fresh/d
   (syntax-rules ()
@@ -454,42 +478,31 @@
             (run-and-set-follower F st))
           st))))
 
-;; Run a follower (stored as a (g . t) pair), classify the stream, and
-;; store the (possibly-updated) resume thunk back on the state.
-(define (run-follower-once g t)
-  (lambda (st)
-    (let ([st (state-with-scope st (new-scope))])
-      (let ([$ ((g 0) st)])
-        (case-inf/d $
-          [()
-           (begin
-             (increment-counter! *fail-counter*)
-             #f)]
-          [(c)
-           (begin
-             (increment-counter! *singleton-succeed-counter*)
-             c)]
-          [(c f^)
-           (begin
-             (increment-counter! *non-singleton-succeed-counter*)
-             (cons c f^))])))))
-
 (define (run-and-set-follower F st)
   (let ([g (car F)]
         [t (cdr F)]
         [before-walked (walk* (cdr F) (state-S st))])
-    (let ([$ ((run-follower-once g t) st)])
-      (check-type $ inf/d?)
+    (let ([$ ((g 0) (state-with-scope st (new-scope)))])
       (case-inf/d $
-        [() #f]
+        [()
+         (begin
+           (increment-counter! *fail-counter*)
+           #f)]
         [(c^)
          (begin
+           (increment-counter! *singleton-succeed-counter*)
            (tally-productivity! before-walked t c^)
            (state-with-F c^ #f))]
         [(c^ f^)
          (begin
+           (increment-counter! *non-singleton-succeed-counter*)
            (tally-productivity! before-walked t c^)
-           (state-with-F c^ (cons f^ t)))]))))
+           (state-with-F c^ (cons f^ t)))]
+        [(ch fh)
+         (begin
+           (increment-counter! *non-singleton-succeed-counter*)
+           (tally-productivity! before-walked t ch)
+           (state-with-F ch (cons fh t)))]))))
 
 (define (tally-productivity! before-walked t c^)
   (let ([after-walked (walk* t (state-S c^))])
