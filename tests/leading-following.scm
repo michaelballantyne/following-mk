@@ -89,90 +89,86 @@
 
 ;;; --- leader-driven search with follower pruning
 
-(parameterize ([*check-follower-every* 1])
-  (test "follower refutes wrong top-level form"
-    (run 1 (q)
-      (absento 'closure q)
-      (follower
-        q
-        (fresh/d ()
-          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
-                                  ,q)])
-                      (f '()))
-                   '())
-          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
-                                  ,q)])
-                      (f (cons 3 '())))
-                   '(3))))
-      (evalo `(letrec ([f (lambda (l) : ((list) -> list)
-                            ,q)])
-                (f '()))
-             '())
-      (evalo `(letrec ([f (lambda (l) : ((list) -> list)
-                            ,q)])
-                (f (cons 3 '())))
-             '(3)))
-    '(l)))
+(test "follower refutes wrong top-level form"
+  (run 1 (q)
+    (absento 'closure q)
+    (follower
+      q
+      (fresh/d ()
+        (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
+                                ,q)])
+                    (f '()))
+                 '())
+        (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
+                                ,q)])
+                    (f (cons 3 '())))
+                 '(3))))
+    (evalo `(letrec ([f (lambda (l) : ((list) -> list)
+                          ,q)])
+              (f '()))
+           '())
+    (evalo `(letrec ([f (lambda (l) : ((list) -> list)
+                          ,q)])
+              (f (cons 3 '())))
+           '(3)))
+  '(l))
 
-(parameterize ([*check-follower-every* 1])
-  (test "follower refutes constant expression"
-    (run 1 (q)
-      (absento 'closure q)
-      (follower
-        q
-        (fresh/d ()
-          (evalo/d `(letrec ([id (lambda (l) : ((list) -> list)
-                                   ,q)])
-                      (id (cons 1 (cons 2 '()))))
-                   '(1 2))
-          (evalo/d `(letrec ([id (lambda (l) : ((list) -> list)
-                                   ,q)])
-                      (id (cons 3 (cons 4 '()))))
-                   '(3 4))))
-      (evalo `(letrec ([id (lambda (l) : ((list) -> list)
-                             ,q)])
-                (id (cons 1 (cons 2 '()))))
-             '(1 2))
-      (evalo `(letrec ([id (lambda (l) : ((list) -> list)
-                             ,q)])
-                (id (cons 3 (cons 4 '()))))
-             '(3 4)))
-    '(l)))
+(test "follower refutes constant expression"
+  (run 1 (q)
+    (absento 'closure q)
+    (follower
+      q
+      (fresh/d ()
+        (evalo/d `(letrec ([id (lambda (l) : ((list) -> list)
+                                 ,q)])
+                    (id (cons 1 (cons 2 '()))))
+                 '(1 2))
+        (evalo/d `(letrec ([id (lambda (l) : ((list) -> list)
+                                 ,q)])
+                    (id (cons 3 (cons 4 '()))))
+                 '(3 4))))
+    (evalo `(letrec ([id (lambda (l) : ((list) -> list)
+                           ,q)])
+              (id (cons 1 (cons 2 '()))))
+           '(1 2))
+    (evalo `(letrec ([id (lambda (l) : ((list) -> list)
+                           ,q)])
+              (id (cons 3 (cons 4 '()))))
+           '(3 4)))
+  '(l))
 
 ;;; --- leader/follower with different example placement
 
-(parameterize ([*check-follower-every* 1])
-  (test "leader empty, follower non-empty"
-    (run 1 (q)
-      (absento 'closure q)
-      (follower
-        q
-        (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
-                                ,q)])
-                    (f (cons 1 '())))
-                 '(1)))
-      (evalo `(letrec ([f (lambda (l) : ((list) -> list)
-                            ,q)])
-                (f '()))
-             '()))
-    '(l)))
+(test "leader empty, follower non-empty"
+  (run 1 (q)
+    (absento 'closure q)
+    (follower
+      q
+      (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
+                              ,q)])
+                  (f (cons 1 '())))
+               '(1)))
+    (evalo `(letrec ([f (lambda (l) : ((list) -> list)
+                          ,q)])
+              (f '()))
+           '()))
+  '(l))
 
-(parameterize ([*check-follower-every* 1])
-  (test "leader empty, follower prepend"
-    (run 1 (q)
-      (absento 'closure q)
-      (follower
-        q
-        (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
-                                ,q)])
-                    (f (cons 2 '())))
-                 '(1 2)))
-      (evalo `(letrec ([f (lambda (l) : ((list) -> list)
-                            ,q)])
-                (f '()))
-             '(1))
-      (evalo `(letrec ([f (lambda (l) : ((list) -> list)
-                            ,q)])
-                (f (cons 2 '())))
-             '(1 2)))
-    '((cons 1 l))))
+(test "leader empty, follower prepend"
+  (run 1 (q)
+    (absento 'closure q)
+    (follower
+      q
+      (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
+                              ,q)])
+                  (f (cons 2 '())))
+               '(1 2)))
+    (evalo `(letrec ([f (lambda (l) : ((list) -> list)
+                          ,q)])
+              (f '()))
+           '(1))
+    (evalo `(letrec ([f (lambda (l) : ((list) -> list)
+                          ,q)])
+              (f (cons 2 '())))
+           '(1 2)))
+  '((cons 1 l)))
