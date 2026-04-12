@@ -302,8 +302,49 @@
                  q)))
     '((3 4 6))))
 
-(time
-  (test "interp eval ground program rember all"
+(time-test "interp eval ground program rember all"
+  (run 1 (v1 v2 v3 v4)
+    (fresh (q)
+      (== q
+          '(match l
+             ['() l]
+             [(cons a d)
+              (if (= a e)
+                  d
+                  (cons a (rember e d)))]))
+      (absento 3 q)
+      (absento 4 q)
+      (absento 5 q)
+      (absento 6 q)
+      (absento 7 q)
+      (evalo `(letrec ([rember (lambda (e l) : ((number list) -> list)
+                                 (match l
+                                   ['() l]
+                                   [(cons a d)
+                                    (if (= a e)
+                                        d
+                                        (cons a (rember e d)))]))])
+                (rember 5 '()))
+             v1)
+
+      (evalo `(letrec ([rember (lambda (e l) : ((number list) -> list)
+                                 ,q)])
+                (rember 6 (cons 6 '())))
+             v2)
+
+      (evalo `(letrec ([rember (lambda (e l) : ((number list) -> list)
+                                 ,q)])
+                (rember 7 (cons 3 (cons 4 (cons 7 (cons 6 '()))))))
+             v3)
+
+      (evalo `(letrec ([rember (lambda (e l) : ((number list) -> list)
+                                 ,q)])
+                (rember 5 (cons 3 (cons 4 (cons 6 (cons 7 '()))))))
+             v4)))
+  '((() () (3 4 6) (3 4 6 7))))
+
+(parameterize ([*suspend-depth* 1000])
+  (time-test "conde/d interp eval ground program rember all"
     (run 1 (v1 v2 v3 v4)
       (fresh (q)
         (== q
@@ -318,74 +359,31 @@
         (absento 5 q)
         (absento 6 q)
         (absento 7 q)
-        (evalo `(letrec ([rember (lambda (e l) : ((number list) -> list)
-                                   (match l
-                                     ['() l]
-                                     [(cons a d)
-                                      (if (= a e)
-                                          d
-                                          (cons a (rember e d)))]))])
-                  (rember 5 '()))
-               v1)
-
-        (evalo `(letrec ([rember (lambda (e l) : ((number list) -> list)
-                                   ,q)])
-                  (rember 6 (cons 6 '())))
-               v2)
-
-        (evalo `(letrec ([rember (lambda (e l) : ((number list) -> list)
-                                   ,q)])
-                  (rember 7 (cons 3 (cons 4 (cons 7 (cons 6 '()))))))
-               v3)
-
-        (evalo `(letrec ([rember (lambda (e l) : ((number list) -> list)
-                                   ,q)])
-                  (rember 5 (cons 3 (cons 4 (cons 6 (cons 7 '()))))))
-               v4)))
+        (follower
+          '()
+          (fresh/d ()
+            (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
+                                         (match l
+                                           ['() l]
+                                           [(cons a d)
+                                            (if (= a e)
+                                                d
+                                                (cons a (rember e d)))]))])
+                        (rember 5 '()))
+                     v1)
+            (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
+                                         ,q)])
+                        (rember 6 (cons 6 '())))
+                     v2)
+            (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
+                                         ,q)])
+                        (rember 7 (cons 3 (cons 4 (cons 7 (cons 6 '()))))))
+                     v3)
+            (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
+                                         ,q)])
+                        (rember 5 (cons 3 (cons 4 (cons 6 (cons 7 '()))))))
+                     v4)))))
     '((() () (3 4 6) (3 4 6 7)))))
-
-(parameterize ([*suspend-depth* 1000])
-  (time
-    (test "conde/d interp eval ground program rember all"
-      (run 1 (v1 v2 v3 v4)
-        (fresh (q)
-          (== q
-              '(match l
-                 ['() l]
-                 [(cons a d)
-                  (if (= a e)
-                      d
-                      (cons a (rember e d)))]))
-          (absento 3 q)
-          (absento 4 q)
-          (absento 5 q)
-          (absento 6 q)
-          (absento 7 q)
-          (follower
-            '()
-            (fresh/d ()
-              (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
-                                           (match l
-                                             ['() l]
-                                             [(cons a d)
-                                              (if (= a e)
-                                                  d
-                                                  (cons a (rember e d)))]))])
-                          (rember 5 '()))
-                       v1)
-              (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
-                                           ,q)])
-                          (rember 6 (cons 6 '())))
-                       v2)
-              (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
-                                           ,q)])
-                          (rember 7 (cons 3 (cons 4 (cons 7 (cons 6 '()))))))
-                       v3)
-              (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
-                                           ,q)])
-                          (rember 5 (cons 3 (cons 4 (cons 6 (cons 7 '()))))))
-                       v4)))))
-      '((() () (3 4 6) (3 4 6 7))))))
 
 ;;; --- follower refutation tests
 ;;;

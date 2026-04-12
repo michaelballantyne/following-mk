@@ -80,6 +80,7 @@
 (define (install-interrupt-counter-dump!)
   (keyboard-interrupt-handler (lambda ()
                                 (printf "\n--- interrupted; counter snapshot ---\n")
+                                (print-parameters!)
                                 (print-counters!)
                                 (exit 1))))
 
@@ -120,18 +121,79 @@
   (set! *externally-unproductive-trigger-counter* 0)
   (set! *user-counter* 0))
 
+(define counter-descriptors
+  (list (cons "== (main)"
+              (lambda ()
+                *==-counter*))
+        (cons "== (/d)"
+              (lambda ()
+                *==/d-counter*))
+        (cons "follower fail"
+              (lambda ()
+                *fail-counter*))
+        (cons "follower singleton"
+              (lambda ()
+                *singleton-succeed-counter*))
+        (cons "follower non-singleton"
+              (lambda ()
+                *non-singleton-succeed-counter*))
+        (cons "trigger productive"
+              (lambda ()
+                *externally-productive-trigger-counter*))
+        (cons "trigger unproductive"
+              (lambda ()
+                *externally-unproductive-trigger-counter*))
+        (cons "cutoff: unsound fail"
+              (lambda ()
+                *unsound-fail-depth-cutoff-counter*))
+        (cons "cutoff: suspend"
+              (lambda ()
+                *suspend-depth-cutoff-counter*))
+        (cons "cutoff: main unsound"
+              (lambda ()
+                *main-unsound-depth-cutoff-counter*))
+        (cons "user"
+              (lambda ()
+                *user-counter*))))
+
 (define (print-counters!)
-  (printf "*unsound-fail-depth-cutoff-counter*: ~s\n" *unsound-fail-depth-cutoff-counter*)
-  (printf "*suspend-depth-cutoff-counter*: ~s\n" *suspend-depth-cutoff-counter*)
-  (printf "*main-unsound-depth-cutoff-counter*: ~s\n" *main-unsound-depth-cutoff-counter*)
-  (printf "*==-counter*: ~s\n" *==-counter*)
-  (printf "*==/d-counter*: ~s\n" *==/d-counter*)
-  (printf "*fail-counter*: ~s\n" *fail-counter*)
-  (printf "*singleton-succeed-counter*: ~s\n" *singleton-succeed-counter*)
-  (printf "*non-singleton-succeed-counter*: ~s\n" *non-singleton-succeed-counter*)
-  (printf "*externally-productive-trigger-counter*: ~s\n" *externally-productive-trigger-counter*)
-  (printf "*externally-unproductive-trigger-counter*: ~s\n" *externally-unproductive-trigger-counter*)
-  (printf "*user-counter*: ~s\n" *user-counter*))
+  (let ([nonzero (remp (lambda (d)
+                         (= ((cdr d)) 0))
+                       counter-descriptors)])
+    (if (null? nonzero)
+        (printf "  (all counters zero)\n")
+        (let ([label-w (apply max
+                              (map (lambda (d)
+                                     (string-length (car d)))
+                                   nonzero))]
+              [val-w (apply max
+                            (map (lambda (d)
+                                   (string-length (number->string ((cdr d)))))
+                                 nonzero))])
+          (for-each (lambda (d)
+                      (let* ([label (car d)]
+                             [val (number->string ((cdr d)))]
+                             [pad-label (make-string (- label-w (string-length label)) #\space)]
+                             [pad-val (make-string (- val-w (string-length val)) #\space)])
+                        (printf "  ~a~a  ~a~a\n" label pad-label pad-val val)))
+                    nonzero)))))
+
+(define (print-parameters!)
+  (let ([parts
+         (remp
+          not
+          (list
+           (let ([v (*suspend-depth*)]) (and (not (= v 20)) (format "suspend-depth=~a" v)))
+           (let ([v (*check-follower-every*)]) (and (not (= v 1)) (format "check-every=~a" v)))
+           (let ([v (*unsound-fail-depth*)]) (and (not (= v +inf.0)) (format "unsound-fail=~a" v)))
+           (let ([v (*main-unsound-depth*)]) (and (not (= v +inf.0)) (format "main-unsound=~a" v)))
+           (and (*print-follower-term*) "print-follower")))])
+    (unless (null? parts)
+      (printf "  [~a]\n"
+              (let loop ([ps parts])
+                (if (null? (cdr ps))
+                    (car ps)
+                    (string-append (car ps) "  " (loop (cdr ps)))))))))
 
 ;;; Goal that increments *user-counter* for ad-hoc instrumentation.
 (define (user-count)
@@ -172,6 +234,7 @@
                                                      (lambda ()
                                                        #f)))))))
                                      empty-state)))])
+         (print-parameters!)
          (print-counters!)
          result))]
     [(_ n (q0 q1 q ...) g0 g ...)
@@ -222,10 +285,7 @@
 (define-record-type hard-suspended (fields state thunk))
 
 (define (inf/d? v)
-  (or (not v)
-      (hard-suspended? v)
-      (and (pair? v) (state? (car v)) (procedure? (cdr v)))
-      (state? v)))
+  (or (not v) (hard-suspended? v) (and (pair? v) (state? (car v)) (procedure? (cdr v))) (state? v)))
 
 (define-syntax case-inf/d
   (syntax-rules ()
@@ -237,8 +297,7 @@
           (let ([ch (hard-suspended-state stream)]
                 [fh (hard-suspended-thunk stream)])
             e3)]
-         [(not (and (pair? stream) (procedure? (cdr stream))))
-          (let ([c^ stream]) e1)]
+         [(not (and (pair? stream) (procedure? (cdr stream)))) (let ([c^ stream]) e1)]
          [else
           (let ([c (car stream)]
                 [f (cdr stream)])
@@ -293,7 +352,8 @@
                                          (lambda (suspend-depth)
                                            (check-type suspend-depth number?)
                                            (lambda (st)
-                                             ((((conj/d* b ...) unsound-fail-depth) suspend-depth) st)))))))) ...)
+                                             ((((conj/d* b ...) unsound-fail-depth) suspend-depth)
+                                              st)))))))) ...)
                      (lambda ()
                        conde/d-g))])
             conde/d-g)))]))
@@ -318,8 +378,7 @@
                       (case-inf/d guard-stream
                         [() #f]
                         [(c) (conj/d-run suspend-depth (list (body suspend-depth)) c '() '())]
-                        [(c f)
-                         (conj/d-run suspend-depth (list (body suspend-depth)) c (list f) '())]
+                        [(c f) (conj/d-run suspend-depth (list (body suspend-depth)) c (list f) '())]
                         [(ch fh)
                          (conj/d-run suspend-depth (list (body suspend-depth)) ch '() (list fh))])))
                (let* ([clause-evaluated (((car clauses) suspend-depth) st)]
@@ -331,7 +390,6 @@
                     (if previously-found-clause
                         (nondeterministic)
                         (loop (cdr clauses) (cons guard-stream body-g)))])))))))))
-
 
 ;;; --- conjunction / depth-threaded goal primitives
 
@@ -353,13 +411,16 @@
           (let ([changed? (or (not (eq? entry-C (state-C st)))
                               (not (eq? entry-M (subst-map (state-S st)))))])
             (cond
-              [(and (null? soft) (null? hard))
-               st]
+              [(and (null? soft) (null? hard)) st]
               [(and (not (null? soft)) changed?)
                ;; Progress was made — iterate on soft-suspended goals.
                (conj/d-run suspend-depth
-                           (map (lambda (f) (f suspend-depth)) (reverse soft))
-                           st '() hard)]
+                           (map (lambda (f)
+                                  (f suspend-depth))
+                                (reverse soft))
+                           st
+                           '()
+                           hard)]
               [else
                ;; No more progress. Build result from remaining goals.
                (let ([resume (conj/d-resume (reverse soft) hard)])
@@ -378,13 +439,19 @@
   (let ([all (append soft hard)])
     (lambda (sd)
       (lambda (st)
-        (conj/d-run sd (map (lambda (f) (f sd)) all) st '() '())))))
-
+        (conj/d-run sd
+                    (map (lambda (f)
+                           (f sd))
+                         all)
+                    st
+                    '()
+                    '())))))
 
 (define succeed/d
   (lambda (unsound-fail-depth)
     (lambda (suspend-depth)
-      (lambda (st) st))))
+      (lambda (st)
+        st))))
 
 (define-syntax conj/d*
   (syntax-rules ()
@@ -396,8 +463,12 @@
          (lambda (suspend-depth)
            (lambda (st)
              (conj/d-run suspend-depth
-                         (map (lambda (g) ((g unsound-fail-depth) suspend-depth)) gs)
-                         st '() '())))))]))
+                         (map (lambda (g)
+                                ((g unsound-fail-depth) suspend-depth))
+                              gs)
+                         st
+                         '()
+                         '())))))]))
 
 (define-syntax fresh/d
   (syntax-rules ()

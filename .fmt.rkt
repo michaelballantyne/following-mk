@@ -52,8 +52,9 @@
     ;; (follower name term goal) — always put all arguments on their own
     ;; lines, indented 2 (like `time`).
     [("follower") (format-uniform-body/helper 0)]
-    ;; (test name expr expected) — name is head, expr+expected are body.
-    [("test") (format-uniform-body/helper 1)]
+    ;; (test name expr expected) / (example name expr) — name is head, rest is body.
+    ;; time-test and time-example are timed variants.
+    [("test" "example" "time-test" "time-example") (format-uniform-body/helper 1)]
     ;; (time body) — always put the argument on its own line, indented 2.
     [("time") (format-uniform-body/helper 0)]
     ;; conde and conde/d: each clause on its own line, and each clause's

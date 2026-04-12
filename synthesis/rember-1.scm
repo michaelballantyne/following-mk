@@ -22,25 +22,23 @@
                              (cons a (rember e d)))]))])
      ,body))
 
-(time
-  (test "rember hole-1 no follower"
-    (run 1 (p)
-      (evalo (rember-prog p '(rember 5 '())) '())
-      (evalo (rember-prog p '(rember 6 (cons 6 '()))) '())
-      ;; ex3 -- discriminates p = e from p = a
-      (evalo (rember-prog p '(rember 7 (cons 3 '()))) '(3)))
-    '(e)))
+(time-test "rember hole-1 no follower"
+  (run 1 (p)
+    (evalo (rember-prog p '(rember 5 '())) '())
+    (evalo (rember-prog p '(rember 6 (cons 6 '()))) '())
+    ;; ex3 -- discriminates p = e from p = a
+    (evalo (rember-prog p '(rember 7 (cons 3 '()))) '(3)))
+  '(e))
 
-(time
-  (test "rember hole-1 with follower"
-    (run 1 (p)
-      (follower
-        p
-        (fresh/d ()
-          (evalo/d (rember-prog p '(rember 5 '())) '())
-          (evalo/d (rember-prog p '(rember 6 (cons 6 '()))) '())
-          (evalo/d (rember-prog p '(rember 7 (cons 3 '()))) '(3))))
-      (evalo (rember-prog p '(rember 5 '())) '())
-      (evalo (rember-prog p '(rember 6 (cons 6 '()))) '())
-      (evalo (rember-prog p '(rember 7 (cons 3 '()))) '(3)))
-    '(e)))
+(time-test "rember hole-1 with follower"
+  (run 1 (p)
+    (follower
+      p
+      (fresh/d ()
+        (evalo/d (rember-prog p '(rember 5 '())) '())
+        (evalo/d (rember-prog p '(rember 6 (cons 6 '()))) '())
+        (evalo/d (rember-prog p '(rember 7 (cons 3 '()))) '(3))))
+    (evalo (rember-prog p '(rember 5 '())) '())
+    (evalo (rember-prog p '(rember 6 (cons 6 '()))) '())
+    (evalo (rember-prog p '(rember 7 (cons 3 '()))) '(3)))
+  '(e))
