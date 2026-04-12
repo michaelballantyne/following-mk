@@ -91,7 +91,7 @@
         ([cv ct]
          [(symbolo/d rator)]
          [(absento/d rator '(quote cons letrec match if))]) ;; rator is var
-        ([a d]
+        #;([a d]
          [(==/d rator (cons a d))]
          []))] ;; rator is pair
      [(eval-expo/d rator

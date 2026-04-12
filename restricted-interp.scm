@@ -85,6 +85,7 @@
 
     ((fresh (rator x* rands body env^ a* at* res)
        (== `(,rator . ,rands) expr)
+       (symbolo rator)
        ; EI can be either E or I here
        (eval-expo rator
                   env
