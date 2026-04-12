@@ -47,7 +47,7 @@
 
 (define *unsound-fail-depth* (make-parameter +inf.0))
 
-(define *suspend-depth* (make-parameter 10))
+(define *suspend-depth* (make-parameter 20))
 
 ;;; --- main-search parameters (threaded through the outer state, not
 ;;; the follower's internal search)
@@ -357,8 +357,8 @@
                st]
               [(and (not (null? soft)) changed?)
                ;; Progress was made — iterate on soft-suspended goals.
-               (conj/d-run (+ 1 suspend-depth)
-                           (map (lambda (f) (f (+ 1 suspend-depth))) (reverse soft))
+               (conj/d-run suspend-depth
+                           (map (lambda (f) (f suspend-depth)) (reverse soft))
                            st '() hard)]
               [else
                ;; No more progress. Build result from remaining goals.
