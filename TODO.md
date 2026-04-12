@@ -35,3 +35,5 @@
 - Consider removing the set-var-val! optimization from the implementation entirely. But maybe we want to do that in base faster-mk too or first? Will thinks it has negative value on the ecosystem.
 
 - Explore using a first-order representation for the /d part of the search. It might make it easier to flatten away unneeded structure, like nested conjunctions that show up after a determinate conde simplifies. Then we could spend less just in rebuilding tree structure each time we run the follower. Similarly we might also be able to save the state of each branch's guard in a nondeterminate conde, so we don't have to re-do work on progressing it next time.
+
+- Write examples or tests illustrating limitations---in what way is this not full fair conjunction? Things that would terminate with CDCL or Petr Lozov's work but don't here.
