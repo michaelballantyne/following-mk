@@ -57,6 +57,10 @@
      [(==/d `(,x . ,dx*) x*)
       (==/d `(,a . ,da*) a*)
       (==/d `(,t . ,dt*) t*)
+      ;; NB: unifies `out` (not env2) in the guard so that when `out`
+      ;; is ground the clause can commit immediately. This reverses the
+      ;; accumulation direction vs. ext-env*o; see interp-d-adaptations
+      ;; design note. Semantically equivalent given the absento/d below.
       (==/d `((,x . (val ,t . ,a)) . ,env2) out)
       (symbolo/d x)
       (symbolo/d t)
@@ -88,8 +92,11 @@
      [(eval-expo/d e1 env v1 'I 'number) (eval-expo/d e2 env v2 'I 'list)])
     ([rator x* rands body env^ a* at* res]
      [(==/d `(,rator . ,rands) expr)
+      ;; NB: the plain interp relies on recursive eval of rator to
+      ;; fail when rator is a syntactic keyword. Here the recursive
+      ;; eval is in the body, so we must disambiguate eagerly in the
+      ;; guard. See interp-d-adaptations design note.
       (symbolo/d rator)
-      ;; need to make nonoverlapping with syntactic forms
       (absento/d rator '(quote cons letrec match if))]
      [(eval-expo/d rator
                    env
