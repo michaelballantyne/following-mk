@@ -369,6 +369,177 @@
                        v4)))))
       '((() () (3 4 6) (3 4 6 7))))))
 
+;;; --- follower refutation tests
+;;;
+;;; These test the follower's ability to prune wrong branches in the main
+;;; search. The main search explores different program structures for q;
+;;; the follower evaluates examples against each candidate and kills
+;;; branches that can't produce the right output. With check-follower-every
+;;; = 1, the follower fires right after the main search commits to a
+;;; structure, giving immediate refutation.
+
+;; The main search might try q = (cons ...) or q = (quote ...) before
+;; finding q = (match ...). The follower should refute the wrong forms
+;; immediately: (cons ...) evaluated in empty env can't produce '() for
+;; the base case, and a quoted value can't depend on the input.
+(parameterize ([*check-follower-every* 1])
+  (test "follower refutes wrong top-level form"
+    (run 1 (q)
+      (absento 'closure q)
+      (follower
+        q
+        (fresh/d ()
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+                      (f '()))
+                   '())
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+                      (f (cons 3 '())))
+                   '(3))))
+      (evalo `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+                (f '()))
+             '())
+      (evalo `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+                (f (cons 3 '())))
+             '(3)))
+    '(l)))
+
+;; q is the body of a function that should return its input unchanged
+;; for 2-element lists but the main search might try a constant like
+;; '() or a cons of literals. The follower checks two examples and
+;; refutes anything that doesn't vary with the input.
+(parameterize ([*check-follower-every* 1])
+  (test "follower refutes constant expression"
+    (run 1 (q)
+      (absento 'closure q)
+      (follower
+        q
+        (fresh/d ()
+          (evalo/d `(letrec ([id (lambda (l) : ((list) -> list) ,q)])
+                      (id (cons 1 (cons 2 '()))))
+                   '(1 2))
+          (evalo/d `(letrec ([id (lambda (l) : ((list) -> list) ,q)])
+                      (id (cons 3 (cons 4 '()))))
+                   '(3 4))))
+      (evalo `(letrec ([id (lambda (l) : ((list) -> list) ,q)])
+                (id (cons 1 (cons 2 '()))))
+             '(1 2))
+      (evalo `(letrec ([id (lambda (l) : ((list) -> list) ,q)])
+                (id (cons 3 (cons 4 '()))))
+             '(3 4)))
+    '(l)))
+
+;; The main search tries two bodies for f: (cons 1 '()) which is
+;; wrong (produces (1) not (3)), and l which is right. The follower
+;; refutes the cons branch via the second example.
+(parameterize ([*check-follower-every* 1])
+  (test "follower refutes wrong branch via interpreter"
+    (run 1 (q)
+      (follower
+        q
+        (fresh/d ()
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+                      (f '()))
+                   '())
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+                      (f (cons 3 '())))
+                   '(3))))
+      (conde
+        [(== q '(cons 1 '()))]
+        [(== q 'l)]))
+    '(l)))
+
+(parameterize ([*check-follower-every* 1])
+  (test "follower refutes constant via non-empty example"
+    (run 1 (q)
+      (follower
+        q
+        (fresh/d ()
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+                      (f '()))
+                   '())
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+                      (f (cons 5 '())))
+                   '(5))))
+      (conde
+        [(== q ''())]
+        [(== q 'l)]))
+    '(l)))
+
+;; Main search picks between three specific bodies for a function that
+;; prepends 1: l (identity — wrong), '(1) (constant — wrong for
+;; non-empty input), (cons 1 l) (correct). Follower refutes the first
+;; two via two examples.
+(parameterize ([*check-follower-every* 1])
+  (test "follower picks cons 1 l over identity and constant"
+    (run 1 (q)
+      (follower
+        q
+        (fresh/d ()
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+                      (f '()))
+                   '(1))
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+                      (f (cons 2 '())))
+                   '(1 2))))
+      (conde
+        [(== q 'l)]
+        [(== q ''(1))]
+        [(== q '(cons 1 l))]))
+    '((cons 1 l))))
+
+;; Main search has a partially-known rember with three candidate else
+;; branches: d (drop the element AND everything after — wrong),
+;; '() (wrong for non-empty tails), (rember e d) (correct recursive
+;; call). Follower refutes the first two.
+(parameterize ([*check-follower-every* 1])
+  (test "follower refutes wrong rember else-branch"
+    (run 1 (q)
+      (follower
+        q
+        (fresh/d ()
+          (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
+                               (match l
+                                 ['() l]
+                                 [(cons a d) (if (= a e) d (cons a ,q))]))])
+                      (rember 5 '()))
+                   '())
+          (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
+                               (match l
+                                 ['() l]
+                                 [(cons a d) (if (= a e) d (cons a ,q))]))])
+                      (rember 5 (cons 3 (cons 4 (cons 5 '())))))
+                   '(3 4))))
+      (conde
+        [(== q 'd)]
+        [(== q ''())]
+        [(== q '(rember e d))]))
+    '((rember e d))))
+
+;; Three candidates for the whole body of an identity function:
+;; '() (constant — fails on non-empty), (cons 1 l) (prepends 1 —
+;; fails when input doesn't start with 1), l (correct). Tests that
+;; the follower can refute multiple wrong candidates in sequence.
+(parameterize ([*check-follower-every* 1])
+  (test "follower refutes two candidates, picks identity"
+    (run 1 (q)
+      (follower
+        q
+        (fresh/d ()
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+                      (f '()))
+                   '())
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+                      (f (cons 3 '())))
+                   '(3))
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+                      (f (cons 7 (cons 8 '()))))
+                   '(7 8))))
+      (conde
+        [(== q ''())]
+        [(== q '(cons 1 l))]
+        [(== q 'l)]))
+    '(l)))
+
 ;; Two adjacent conjuncts that each diverge (r/d recurses infinitely).
 ;; Without the depth limit and hard-suspend mechanism, the conjunction
 ;; bounces back and forth between the two r/d calls forever: each
