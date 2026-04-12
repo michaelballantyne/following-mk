@@ -1,7 +1,3 @@
-- Turn the parameter prints into a pretty table.
-
-- Split out tests for the /d language vs tests for evalo/d's refutation behavior with finite sets of expression options vs tests where a following evaluator refutes examples proposed by a leading interpreter.
-
 - Related to the previous, turn the recent experiments (ex.scm, ex2.scm, ex3.scm) into tests or reproducible experiment files that explain things we've learned and let us see when other changes invalidate this knowledge.
     - With the mK search we interleave explorations of terms of very different size---ex. after testing a term of size 31, we go back to a term of size 3.
     - With search driven by the interpreter we are (somewhat) exploring in terms of evaluation effort, not term size. Vague hypothesis: some term shapes make a lot more evaluation work than others (with some of the degenerate cases like nested applications being cheap?).
@@ -39,3 +35,7 @@
 - Write examples or tests illustrating limitations---in what way is this not full fair conjunction? Things that would terminate with CDCL or Petr Lozov's work but don't here.
 
 - A more ambitious future idea: this might compose easily with mkcdcl! And maybe you could even restrict the provenance and search tree structure tracking to the infrequently-executed follower search, with some cleverness.
+
+- I'm not sure if I understand whether once something has failed or been forced in the follower that equivalent work in the leader will always be avoided. Learned constraints are communicated via the constraint store, but that may not correspond to cutting off all related unnecessary exploration of goals. 
+
+- Enhance test-check to give us a summary at the end of test-all.scm.

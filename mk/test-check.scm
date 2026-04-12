@@ -1,4 +1,6 @@
 (define test-failed #f)
+(define test-count 0)
+(define test-fail-count 0)
 
 (define-syntax test
   (syntax-rules ()
@@ -6,11 +8,13 @@
      (begin
        (newline)
        (printf "Testing ~s\n" title)
+       (set! test-count (+ test-count 1))
        (let* ((expected expected-result)
               (produced tested-expression))
          (or (equal? expected produced)
              (begin
                (set! test-failed #t)
+               (set! test-fail-count (+ test-fail-count 1))
                (printf "Failed: ~s~%Expected: ~s~%Computed: ~s~%"
                      'tested-expression expected produced))))))))
 
@@ -32,3 +36,10 @@
   (syntax-rules ()
     ((_ title expression)
      (time (example title expression)))))
+
+(define (test-summary)
+  (newline)
+  (if test-failed
+      (printf "~a/~a tests passed, ~a FAILED\n"
+              (- test-count test-fail-count) test-count test-fail-count)
+      (printf "All ~a tests passed.\n" test-count)))

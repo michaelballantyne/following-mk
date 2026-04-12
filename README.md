@@ -1,6 +1,6 @@
 # following-mk
 
-> ⚠️ Lots of vibecoding, including the documentation.
+> ⚠️ Lots of vibecoding, including the documentation and research notes.
 
 A research prototype exploring a determinacy-directed "follower"
 mechanism on top of faster-miniKanren. This is a fresh re-build that
@@ -106,7 +106,11 @@ load.scm                          loads mk/ + following.scm
 following.scm                     conde/d, follower, counters, /d wrappers
 restricted-interp.scm             plain relational interpreter (Osera/Zdancewic)
 restricted-interp-following.scm   /d version of the same interpreter
-tests.scm                         sanity tests (runnable standalone)
+test-all.scm                      loads and runs all test files
+tests/determinacy-goal-forms.scm  /d primitives: conde/d, fresh/d, conjunction, depth
+tests/following-interpreter.scm   evalo/d: ground eval, partial eval, suspend/resume
+tests/finite-refutation.scm       follower refutation with finite candidate sets
+tests/leading-following.scm       leader (evalo) + follower (evalo/d) interaction
 synthesis/                        synthesis benchmarks (drive via run.sh)
 run.sh                            driver for synthesis experiments
 claude/                           design notes
@@ -122,10 +126,10 @@ branching so stashed followers can re-fire at each choice point.
 Chez resolves `load` paths against the working directory, so always run
 chez from the repo root.
 
-The sanity tests load everything themselves:
+The tests load everything themselves:
 
 ```
-chez --script tests.scm
+chez --script test-all.scm
 ```
 
 The synthesis benchmarks don't — use `run.sh`:

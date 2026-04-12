@@ -5,6 +5,10 @@ is, the `/d` primitives, the depth parameters, how to run things, and the
 repo layout. Read it before making non-trivial changes — don't duplicate
 its content here.
 
+This is a research prototype with no external users. There are no
+backwards-compatibility constraints — rename, reorganize, and delete
+freely to keep the codebase clean.
+
 ## Notes
 
 Durable design notes live in [`claude/`](claude/), one markdown file per
@@ -18,8 +22,8 @@ the follower internals or the mk.scm fork.
 The Scheme sources are formatted with `raco fmt`. A project-local config
 lives at `.fmt.rkt` and teaches the formatter about this repo's forms:
 
-- `fresh`, `fresh/d`, `run`, `run*`, `follower`, `test` — body-style
-  like `lambda`
+- `fresh`, `fresh/d`, `run`, `run*`, `follower`, `test`, `example`,
+  `time-test`, `time-example` — body-style like `lambda`
 - `conde`, `conde/d` — each clause on its own line, and each clause's
   children (goals for `conde`, three sub-lists for `conde/d`) forced
   onto separate vertical lines aligned under the first child
@@ -33,7 +37,7 @@ Reformat in place:
 
 ```
 raco fmt -i following.scm restricted-interp.scm restricted-interp-following.scm \
-           tests.scm synthesis/*.scm
+           tests/*.scm synthesis/*.scm ex*.scm
 ```
 
 Preview without writing:
