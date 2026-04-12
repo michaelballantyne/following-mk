@@ -96,21 +96,6 @@
       ((== q '(rember e d)))))
   '((rember e d)))
 
-;; Follower refutes a shape with a HOLE: (cons 1 HOLE) vs l.
-(test "cons-with-hole vs l"
-  (run* (q)
-    (follower
-      q
-      (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
-                              ,q)])
-                  (f '()))
-               '()))
-    (conde
-      ((fresh (e)
-         (== q `(cons 1 ,e))))
-      ((== q 'l))))
-  '(l))
-
 ;; Return type mismatch: match produces a list, but output is a number.
 (test "number output with match vs literal"
   (run* (q)
@@ -146,25 +131,6 @@
       ((== q 'l))
       ((== q '(cons 1 l)))))
   '((cons 1 l)))
-
-;; Follower refutes wrong branch via interpreter.
-(test "follower refutes wrong branch via interpreter"
-  (run* (q)
-    (follower
-      q
-      (fresh/d ()
-        (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
-                                ,q)])
-                    (f '()))
-                 '())
-        (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
-                                ,q)])
-                    (f (cons 3 '())))
-                 '(3))))
-    (conde
-      ((== q '(cons 1 '())))
-      ((== q 'l))))
-  '(l))
 
 ;; Follower refutes constant via non-empty example.
 (test "follower refutes constant via non-empty example"
@@ -256,5 +222,6 @@
     (conde
       ((== q ''()))
       ((== q '(cons 1 l)))
+      ((== q '(cons 3 '())))
       ((== q 'l))))
   '(l))

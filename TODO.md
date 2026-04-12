@@ -39,3 +39,5 @@
 - I'm not sure if I understand whether once something has failed or been forced in the follower that equivalent work in the leader will always be avoided. Learned constraints are communicated via the constraint store, but that may not correspond to cutting off all related unnecessary exploration of goals. 
 
 - Enhance test-check to give us a summary at the end of test-all.scm.
+
+- Experiment with separate interpreter and typechecker for the same language. Can they work together? Which should be first to act as leader?
