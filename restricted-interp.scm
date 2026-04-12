@@ -56,6 +56,7 @@
        (== `((,x . (val ,t . ,a)) . ,env) env2)
        (symbolo x)
        (symbolo t)
+       (absento x dx*)
        (ext-env*o dx* da* dt* env2 out)))))
 
 (define (evalo expr val)

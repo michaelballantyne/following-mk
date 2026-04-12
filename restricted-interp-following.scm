@@ -59,7 +59,8 @@
       (==/d `(,t . ,dt*) t*)
       (==/d `((,x . (val ,t . ,a)) . ,env2) out)
       (symbolo/d x)
-      (symbolo/d t)]
+      (symbolo/d t)
+      (absento/d x dx*)]
      [(ext-env*o/d dx* da* dt* env env2)])))
 
 (define (evalo/d expr val)
@@ -87,13 +88,9 @@
      [(eval-expo/d e1 env v1 'I 'number) (eval-expo/d e2 env v2 'I 'list)])
     ([rator x* rands body env^ a* at* res]
      [(==/d `(,rator . ,rands) expr)
-      (conde/d ;; need to make nonoverlapping with syntactic forms
-        ([cv ct]
-         [(symbolo/d rator)]
-         [(absento/d rator '(quote cons letrec match if))]) ;; rator is var
-        #;([a d]
-         [(==/d rator (cons a d))]
-         []))] ;; rator is pair
+      (symbolo/d rator)
+      ;; need to make nonoverlapping with syntactic forms
+      (absento/d rator '(quote cons letrec match if))]
      [(eval-expo/d rator
                    env
                    `(closure (lambda ,x*

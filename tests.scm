@@ -2,6 +2,24 @@
 (load "restricted-interp.scm")
 (load "restricted-interp-following.scm")
 
+(test "duplicate lambda params rejected"
+  (run* (q)
+    (evalo '(letrec ([f (lambda (x x) : ((number number) -> number)
+                          x)])
+              (f 1 2))
+           q))
+  '())
+
+(test "duplicate lambda params rejected /d"
+  (run* (q)
+    (follower
+      '()
+      (evalo/d '(letrec ([f (lambda (x x) : ((number number) -> number)
+                              x)])
+                  (f 1 2))
+               q)))
+  '())
+
 (test "conde/d commit"
   (run* (q)
     (follower
@@ -389,16 +407,20 @@
       (follower
         q
         (fresh/d ()
-          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
+                                  ,q)])
                       (f '()))
                    '())
-          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
+                                  ,q)])
                       (f (cons 3 '())))
                    '(3))))
-      (evalo `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+      (evalo `(letrec ([f (lambda (l) : ((list) -> list)
+                            ,q)])
                 (f '()))
              '())
-      (evalo `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+      (evalo `(letrec ([f (lambda (l) : ((list) -> list)
+                            ,q)])
                 (f (cons 3 '())))
              '(3)))
     '(l)))
@@ -414,16 +436,20 @@
       (follower
         q
         (fresh/d ()
-          (evalo/d `(letrec ([id (lambda (l) : ((list) -> list) ,q)])
+          (evalo/d `(letrec ([id (lambda (l) : ((list) -> list)
+                                   ,q)])
                       (id (cons 1 (cons 2 '()))))
                    '(1 2))
-          (evalo/d `(letrec ([id (lambda (l) : ((list) -> list) ,q)])
+          (evalo/d `(letrec ([id (lambda (l) : ((list) -> list)
+                                   ,q)])
                       (id (cons 3 (cons 4 '()))))
                    '(3 4))))
-      (evalo `(letrec ([id (lambda (l) : ((list) -> list) ,q)])
+      (evalo `(letrec ([id (lambda (l) : ((list) -> list)
+                             ,q)])
                 (id (cons 1 (cons 2 '()))))
              '(1 2))
-      (evalo `(letrec ([id (lambda (l) : ((list) -> list) ,q)])
+      (evalo `(letrec ([id (lambda (l) : ((list) -> list)
+                             ,q)])
                 (id (cons 3 (cons 4 '()))))
              '(3 4)))
     '(l)))
@@ -437,15 +463,17 @@
       (follower
         q
         (fresh/d ()
-          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
+                                  ,q)])
                       (f '()))
                    '())
-          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
+                                  ,q)])
                       (f (cons 3 '())))
                    '(3))))
       (conde
-        [(== q '(cons 1 '()))]
-        [(== q 'l)]))
+        ((== q '(cons 1 '())))
+        ((== q 'l))))
     '(l)))
 
 (parameterize ([*check-follower-every* 1])
@@ -454,15 +482,17 @@
       (follower
         q
         (fresh/d ()
-          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
+                                  ,q)])
                       (f '()))
                    '())
-          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
+                                  ,q)])
                       (f (cons 5 '())))
                    '(5))))
       (conde
-        [(== q ''())]
-        [(== q 'l)]))
+        ((== q ''()))
+        ((== q 'l))))
     '(l)))
 
 ;; Main search picks between three specific bodies for a function that
@@ -475,16 +505,18 @@
       (follower
         q
         (fresh/d ()
-          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
+                                  ,q)])
                       (f '()))
                    '(1))
-          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
+                                  ,q)])
                       (f (cons 2 '())))
                    '(1 2))))
       (conde
-        [(== q 'l)]
-        [(== q ''(1))]
-        [(== q '(cons 1 l))]))
+        ((== q 'l))
+        ((== q ''(1)))
+        ((== q '(cons 1 l)))))
     '((cons 1 l))))
 
 ;; Main search has a partially-known rember with three candidate else
@@ -498,21 +530,27 @@
         q
         (fresh/d ()
           (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
-                               (match l
-                                 ['() l]
-                                 [(cons a d) (if (= a e) d (cons a ,q))]))])
+                                       (match l
+                                         ['() l]
+                                         [(cons a d)
+                                          (if (= a e)
+                                              d
+                                              (cons a ,q))]))])
                       (rember 5 '()))
                    '())
           (evalo/d `(letrec ([rember (lambda (e l) : ((number list) -> list)
-                               (match l
-                                 ['() l]
-                                 [(cons a d) (if (= a e) d (cons a ,q))]))])
+                                       (match l
+                                         ['() l]
+                                         [(cons a d)
+                                          (if (= a e)
+                                              d
+                                              (cons a ,q))]))])
                       (rember 5 (cons 3 (cons 4 (cons 5 '())))))
                    '(3 4))))
       (conde
-        [(== q 'd)]
-        [(== q ''())]
-        [(== q '(rember e d))]))
+        ((== q 'd))
+        ((== q ''()))
+        ((== q '(rember e d)))))
     '((rember e d))))
 
 ;; Three candidates for the whole body of an identity function:
@@ -525,19 +563,22 @@
       (follower
         q
         (fresh/d ()
-          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
+                                  ,q)])
                       (f '()))
                    '())
-          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
+                                  ,q)])
                       (f (cons 3 '())))
                    '(3))
-          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list) ,q)])
+          (evalo/d `(letrec ([f (lambda (l) : ((list) -> list)
+                                  ,q)])
                       (f (cons 7 (cons 8 '()))))
                    '(7 8))))
       (conde
-        [(== q ''())]
-        [(== q '(cons 1 l))]
-        [(== q 'l)]))
+        ((== q ''()))
+        ((== q '(cons 1 l)))
+        ((== q 'l))))
     '(l)))
 
 ;; Two adjacent conjuncts that each diverge (r/d recurses infinitely).
@@ -550,33 +591,34 @@
 ;; q = 1 from the other clause.
 (define (r)
   (conde
-    [(fresh (x)
+    ((fresh (x)
        (== x 1)
-       (r))]))
+       (r)))))
 
 (define (r/d)
   (conde/d
-    [[x]
+    ([x]
      [(==/d x 1)]
-     [(r/d)]]))
+     [(r/d)])))
 
 (test "diverging conjuncts terminate via hard-suspend"
   (run 1 (q)
-    (follower q
-              (conde/d
-                [[]
-                 [(==/d q 1)]
-                 []]
-                [[]
-                 [(==/d q 2)
-                  (fresh/d ()
-                           (r/d)
-                           (r/d))]
-                 []]))
+    (follower
+      q
+      (conde/d
+        ([]
+         [(==/d q 1)]
+         [])
+        ([]
+         [(==/d q 2)
+          (fresh/d ()
+            (r/d)
+            (r/d))]
+         [])))
     (conde
-      [(== q 1)]
-      [(fresh ()
+      ((== q 1))
+      ((fresh ()
          (== q 2)
          (r)
-         (r))]))
+         (r)))))
   '(1))
