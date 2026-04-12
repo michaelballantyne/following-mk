@@ -4,7 +4,7 @@
 
 (*check-follower-every* 1)
 
-;; 1. Shape refutation: cons can't produce '()
+;; Shape refutation: cons can't produce '()
 (test "cons vs l for identity"
   (run 1 (q)
     (follower
@@ -19,7 +19,7 @@
       ((== q 'l))))
   '(l))
 
-;; 2. Shape refutation: quote can't vary with input
+;; Shape refutation: quote can't vary with input
 (test "quote vs l"
   (run 1 (q)
     (follower
@@ -39,7 +39,7 @@
       ((== q 'l))))
   '(l))
 
-;; 3. Match with wrong base case. f should be identity.
+;; Match with wrong base case. f should be identity.
 ;; Base case '() -> '() is right, base case '() -> '(1) is wrong.
 (test "match wrong base vs right base"
   (run 1 (q)
@@ -67,7 +67,7 @@
       ['() l]
       [(cons a d) (cons a (f d))])))
 
-;; 4. Rember: three candidate else-branches.
+;; Rember: three candidate else-branches.
 ;; d = just the tail, l = the whole list, (rember e d) = correct.
 (test "rember else-branch"
   (run 1 (q)
@@ -98,7 +98,7 @@
       ((== q '(rember e d)))))
   '((rember e d)))
 
-;; 5. Follower refutes a shape with a HOLE: (cons 1 HOLE) vs l.
+;; Follower refutes a shape with a HOLE: (cons 1 HOLE) vs l.
 (test "cons-with-hole vs l"
   (run 1 (q)
     (follower
@@ -113,7 +113,7 @@
       ((== q 'l))))
   '(l))
 
-;; 6. Return type mismatch: match produces a list, but output is a number.
+;; Return type mismatch: match produces a list, but output is a number.
 (test "number output with match vs literal"
   (run 1 (q)
     (follower
@@ -130,7 +130,7 @@
       ((== q 5))))
   '(5))
 
-;; 7. Cross-example refutation: l works for ex1 but fails for ex2.
+;; Cross-example refutation: l works for ex1 but fails for ex2.
 (test "cross-example refutation"
   (run 1 (q)
     (follower
@@ -149,7 +149,7 @@
       ((== q '(cons 1 l)))))
   '((cons 1 l)))
 
-;; 8. Application shape: (f HOLE) with nothing in scope to eval to a closure.
+;; Application shape: (f HOLE) with nothing in scope to eval to a closure.
 (test "application with nothing in scope"
   (run 1 (q)
     (follower
@@ -164,7 +164,7 @@
       ((== q 'l))))
   '(l))
 
-;; 9. Letrec shape vs l: follower may hit depth limits.
+;; Letrec shape vs l: follower may hit depth limits.
 (test "letrec vs l for identity"
   (run 1 (q)
     (follower
@@ -187,7 +187,7 @@
       ((== q 'l))))
   '(l))
 
-;; 10. Follower refutes wrong branch via interpreter (from original tests.scm).
+;; Follower refutes wrong branch via interpreter.
 (parameterize ([*check-follower-every* 1])
   (test "follower refutes wrong branch via interpreter"
     (run 1 (q)
@@ -207,7 +207,7 @@
         ((== q 'l))))
     '(l)))
 
-;; 11. Follower refutes constant via non-empty example.
+;; Follower refutes constant via non-empty example.
 (parameterize ([*check-follower-every* 1])
   (test "follower refutes constant via non-empty example"
     (run 1 (q)
@@ -227,7 +227,7 @@
         ((== q 'l))))
     '(l)))
 
-;; 12. Follower picks cons 1 l over identity and constant.
+;; Follower picks cons 1 l over identity and constant.
 (parameterize ([*check-follower-every* 1])
   (test "follower picks cons 1 l over identity and constant"
     (run 1 (q)
@@ -248,7 +248,7 @@
         ((== q '(cons 1 l)))))
     '((cons 1 l))))
 
-;; 13. Follower refutes wrong rember else-branch.
+;; Follower refutes wrong rember else-branch.
 (parameterize ([*check-follower-every* 1])
   (test "follower refutes wrong rember else-branch"
     (run 1 (q)
@@ -279,7 +279,7 @@
         ((== q '(rember e d)))))
     '((rember e d))))
 
-;; 14. Follower refutes two candidates, picks identity.
+;; Follower refutes two candidates, picks identity.
 (parameterize ([*check-follower-every* 1])
   (test "follower refutes two candidates, picks identity"
     (run 1 (q)

@@ -102,8 +102,8 @@
   '((1 _.0)))
 
 
-;; --- partial programs: follower suspends, main search fills in, follower resumes
-;; to finish the evaluation and complete the answer.
+;; --- partially instantiated programs, filled in: follower suspends, main search
+;; fills in, follower resumes to finish the evaluation and complete the answer.
 
 (test "conde/d interp partial 1 resume"
   (run 1 (q)
