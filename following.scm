@@ -279,13 +279,11 @@
                                (check-type st state?)
                                (let ([scope (subst-scope (state-S st))])
                                  (let ([x (var scope)] ...)
-                                   (cons (bind/d* st ((g unsound-fail-depth) suspend-depth) ...)
+                                   (cons ((((conj/d* g ...) unsound-fail-depth) suspend-depth) st)
                                          (lambda (suspend-depth)
                                            (check-type suspend-depth number?)
                                            (lambda (st)
-                                             (bind/d* st
-                                                      ((b unsound-fail-depth) suspend-depth)
-                                                      ...)))))))) ...)
+                                             ((((conj/d* b ...) unsound-fail-depth) suspend-depth) st)))))))) ...)
                      (lambda ()
                        conde/d-g))])
             conde/d-g)))]))
@@ -328,28 +326,53 @@
 
 ;;; --- bind/d / fresh/d / depth-threaded goal primitives
 
-(define (bind/d stream g)
-  (check-type stream inf/d?)
-  (check-type (case-inf/d stream
-                [() #f]
-                [(c) (g c)] ;; committed and finished, so just g left to do
-                [(c1 f1) ;; committed but suspended...
-                 (let ([s2 (g c1)])
-                   (case-inf/d s2
-                     [() #f] ;; g fails, so whole thing fails
-                     [(c2) (cons c2 f1)] ;; committed and finished, so just f1 to return to
-                     ;; when we return we need to do both f1 and f2
-                     [(c2 f2)
-                      (cons c2
-                            (lambda (suspend-depth)
-                              (lambda (st)
-                                (bind/d ((f1 suspend-depth) st) (f2 suspend-depth)))))]))])
-              inf/d?))
+(define (changed-state? st st^)
+  (not
+   (and (eq? (state-C st) (state-C st^))
+        (eq? (subst-map (state-S st))
+             (subst-map (state-S st))))))
 
-(define-syntax bind/d*
+(define (bind/d suspend-depth stream g2)
+  (case-inf/d stream
+              [() #f]
+              [(c) (g2 c)] ;; committed and finished, so just g left to do
+              [(c1 f1) ;; committed but suspended...
+               (let ([s2 (g2 (state-with-scope c1 (new-scope)))])
+                 (case-inf/d s2
+                             [() #f] ;; g2 fails, so whole thing fails
+                             [(c2)
+                              (if (changed-state? c1 c2)
+                                  ((f1 suspend-depth) c2)  ;; finished and made progress, go back to f1 from g1
+                                  (cons c2 f1))] ;; finshed without meaningful change, so we are nondet
+                             ;; when we return we need to do both f1 and f2
+                             [(c2 f2)
+                              (if (changed-state? c1 c2)
+                                  (bind/d suspend-depth ((f1 suspend-depth) c2) (f2 suspend-depth)) ;; made progress, go back to f1 from g1 and come back later
+                                  (cons c2
+                                        (lambda (suspend-depth)
+                                          (lambda (st)
+                                            (bind/d suspend-depth ((f1 suspend-depth) st) (f2 suspend-depth))))))]))]))
+
+(define (conj/d g1 g2)
+  (lambda (unsound-fail-depth)
+    (check-type unsound-fail-depth number?)
+    (lambda (suspend-depth)
+      (check-type suspend-depth number?)
+      (lambda (st)
+        (let ([stream (((g1 unsound-fail-depth) suspend-depth) st)])
+          (check-type stream inf/d?)
+          (bind/d suspend-depth stream ((g2 unsound-fail-depth) suspend-depth)))))))
+
+(define succeed/d
+  (lambda (unsound-fail-depth)
+    (lambda (stream)
+      (lambda (st) st))))
+
+(define-syntax conj/d*
   (syntax-rules ()
-    [(_ e) e]
-    [(_ e g0 g ...) (bind/d* (bind/d e g0) g ...)]))
+    [(_) succeed/d]
+    [(_ g0) g0]
+    [(_ g0 g1 g ...) (conj/d* (conj/d g0 g1) g ...)]))
 
 (define-syntax fresh/d
   (syntax-rules ()
@@ -361,8 +384,7 @@
          (lambda (st)
            (let ([scope (subst-scope (state-S st))])
              (let ([x (var scope)] ...)
-               (bind/d* (((g0 unsound-fail-depth) suspend-depth) st)
-                        ((g unsound-fail-depth) suspend-depth) ...))))))]))
+               ((((conj/d* g0 g ...) unsound-fail-depth) suspend-depth) st))))))]))
 
 ;;; --- depth-threading wrappers for the primitive goal constructors used
 ;;; inside conde/d / fresh/d.  Each /d variant takes the same args as its base
