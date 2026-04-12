@@ -49,8 +49,9 @@
     ;; opening paren of the form).
     [("fresh" "fresh/d" "run*") (format-uniform-body/helper 1)]
     [("run") (format-uniform-body/helper 2)]
-    ;; (follower name term goal) — treat name+term as heads, goal as body.
-    [("follower") (format-uniform-body/helper 2)]
+    ;; (follower name term goal) — always put all arguments on their own
+    ;; lines, indented 2 (like `time`).
+    [("follower") (format-uniform-body/helper 0)]
     ;; (test name expr expected) — name is head, expr+expected are body.
     [("test") (format-uniform-body/helper 1)]
     ;; (time body) — always put the argument on its own line, indented 2.

@@ -8,7 +8,8 @@
 ;; Run via `./run.sh synthesis/rember-full-swap.scm`.
 
 (define (rember-prog q body)
-  `(letrec ([rember (lambda (e l) : ((number list) -> list) ,q)])
+  `(letrec ([rember (lambda (e l) : ((number list) -> list)
+                      ,q)])
      ,body))
 
 (time
@@ -24,11 +25,9 @@
       ;; ex1 second
       (evalo (rember-prog q '(rember 5 '())) '())
       ;; ex3
-      (evalo (rember-prog q '(rember 7 (cons 3 (cons 4 (cons 7 (cons 6 '()))))))
-             '(3 4 6))
+      (evalo (rember-prog q '(rember 7 (cons 3 (cons 4 (cons 7 (cons 6 '())))))) '(3 4 6))
       ;; ex4
-      (evalo (rember-prog q '(rember 5 (cons 3 (cons 4 (cons 6 (cons 7 '()))))))
-             '(3 4 6 7)))
+      (evalo (rember-prog q '(rember 5 (cons 3 (cons 4 (cons 6 (cons 7 '())))))) '(3 4 6 7)))
     '(((match l
          ['() l]
          [(cons _.0 _.1)
@@ -54,24 +53,17 @@
       (absento 5 q)
       (absento 6 q)
       (absento 7 q)
-      (follower q
+      (follower
+        q
         (fresh/d ()
           (evalo/d (rember-prog q '(rember 6 (cons 6 '()))) '())
           (evalo/d (rember-prog q '(rember 5 '())) '())
-          (evalo/d (rember-prog q
-                                '(rember 7
-                                         (cons 3 (cons 4 (cons 7 (cons 6 '()))))))
-                   '(3 4 6))
-          (evalo/d (rember-prog q
-                                '(rember 5
-                                         (cons 3 (cons 4 (cons 6 (cons 7 '()))))))
-                   '(3 4 6 7))))
+          (evalo/d (rember-prog q '(rember 7 (cons 3 (cons 4 (cons 7 (cons 6 '())))))) '(3 4 6))
+          (evalo/d (rember-prog q '(rember 5 (cons 3 (cons 4 (cons 6 (cons 7 '())))))) '(3 4 6 7))))
       (evalo (rember-prog q '(rember 6 (cons 6 '()))) '())
       (evalo (rember-prog q '(rember 5 '())) '())
-      (evalo (rember-prog q '(rember 7 (cons 3 (cons 4 (cons 7 (cons 6 '()))))))
-             '(3 4 6))
-      (evalo (rember-prog q '(rember 5 (cons 3 (cons 4 (cons 6 (cons 7 '()))))))
-             '(3 4 6 7)))
+      (evalo (rember-prog q '(rember 7 (cons 3 (cons 4 (cons 7 (cons 6 '())))))) '(3 4 6))
+      (evalo (rember-prog q '(rember 5 (cons 3 (cons 4 (cons 6 (cons 7 '())))))) '(3 4 6 7)))
     '(((match l
          ['() l]
          [(cons _.0 _.1)

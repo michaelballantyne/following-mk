@@ -20,7 +20,10 @@
   `(letrec ([rember (lambda (e l) : ((number list) -> list)
                       (match l
                         ['() l]
-                        [(cons a d) (if (= a e) d (cons a ,p))]))])
+                        [(cons a d)
+                         (if (= a e)
+                             d
+                             (cons a ,p))]))])
      ,body))
 
 (time
@@ -29,43 +32,27 @@
       (evalo (rember-prog p '(rember 5 '())) '())
       (evalo (rember-prog p '(rember 6 (cons 6 '()))) '())
       (evalo (rember-prog p '(rember 7 (cons 3 '()))) '(3))
-      (evalo (rember-prog p '(rember 4 (cons 3 (cons 6 (cons 4 '())))))
-             '(3 6))
-      (evalo (rember-prog p
-                          '(rember 4 (cons 3 (cons 6 (cons 4 (cons 7 '()))))))
-             '(3 6 7))
-      (evalo (rember-prog p
-                          '(rember 7 (cons 3 (cons 4 (cons 5 (cons 7 '()))))))
-             '(3 4 5)))
+      (evalo (rember-prog p '(rember 4 (cons 3 (cons 6 (cons 4 '()))))) '(3 6))
+      (evalo (rember-prog p '(rember 4 (cons 3 (cons 6 (cons 4 (cons 7 '())))))) '(3 6 7))
+      (evalo (rember-prog p '(rember 7 (cons 3 (cons 4 (cons 5 (cons 7 '())))))) '(3 4 5)))
     '((rember e d))))
 
 (time
   (test "rember hole-2 with follower"
     (run 1 (p)
-      (follower p
+      (follower
+        p
         (fresh/d ()
           (evalo/d (rember-prog p '(rember 5 '())) '())
           (evalo/d (rember-prog p '(rember 6 (cons 6 '()))) '())
           (evalo/d (rember-prog p '(rember 7 (cons 3 '()))) '(3))
-          (evalo/d (rember-prog p '(rember 4 (cons 3 (cons 6 (cons 4 '())))))
-                   '(3 6))
-          (evalo/d (rember-prog p
-                                '(rember 4
-                                         (cons 3 (cons 6 (cons 4 (cons 7 '()))))))
-                   '(3 6 7))
-          (evalo/d (rember-prog p
-                                '(rember 7
-                                         (cons 3 (cons 4 (cons 5 (cons 7 '()))))))
-                   '(3 4 5))))
+          (evalo/d (rember-prog p '(rember 4 (cons 3 (cons 6 (cons 4 '()))))) '(3 6))
+          (evalo/d (rember-prog p '(rember 4 (cons 3 (cons 6 (cons 4 (cons 7 '())))))) '(3 6 7))
+          (evalo/d (rember-prog p '(rember 7 (cons 3 (cons 4 (cons 5 (cons 7 '())))))) '(3 4 5))))
       (evalo (rember-prog p '(rember 5 '())) '())
       (evalo (rember-prog p '(rember 6 (cons 6 '()))) '())
       (evalo (rember-prog p '(rember 7 (cons 3 '()))) '(3))
-      (evalo (rember-prog p '(rember 4 (cons 3 (cons 6 (cons 4 '())))))
-             '(3 6))
-      (evalo (rember-prog p
-                          '(rember 4 (cons 3 (cons 6 (cons 4 (cons 7 '()))))))
-             '(3 6 7))
-      (evalo (rember-prog p
-                          '(rember 7 (cons 3 (cons 4 (cons 5 (cons 7 '()))))))
-             '(3 4 5)))
+      (evalo (rember-prog p '(rember 4 (cons 3 (cons 6 (cons 4 '()))))) '(3 6))
+      (evalo (rember-prog p '(rember 4 (cons 3 (cons 6 (cons 4 (cons 7 '())))))) '(3 6 7))
+      (evalo (rember-prog p '(rember 7 (cons 3 (cons 4 (cons 5 (cons 7 '())))))) '(3 4 5)))
     '((rember e d))))

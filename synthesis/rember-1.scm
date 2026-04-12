@@ -16,7 +16,10 @@
   `(letrec ([rember (lambda (e l) : ((number list) -> list)
                       (match l
                         ['() l]
-                        [(cons a d) (if (= a ,p) d (cons a (rember e d)))]))])
+                        [(cons a d)
+                         (if (= a ,p)
+                             d
+                             (cons a (rember e d)))]))])
      ,body))
 
 (time
@@ -31,7 +34,8 @@
 (time
   (test "rember hole-1 with follower"
     (run 1 (p)
-      (follower p
+      (follower
+        p
         (fresh/d ()
           (evalo/d (rember-prog p '(rember 5 '())) '())
           (evalo/d (rember-prog p '(rember 6 (cons 6 '()))) '())

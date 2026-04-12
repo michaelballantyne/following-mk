@@ -129,10 +129,8 @@
   (printf "*fail-counter*: ~s\n" *fail-counter*)
   (printf "*singleton-succeed-counter*: ~s\n" *singleton-succeed-counter*)
   (printf "*non-singleton-succeed-counter*: ~s\n" *non-singleton-succeed-counter*)
-  (printf "*externally-productive-trigger-counter*: ~s\n"
-          *externally-productive-trigger-counter*)
-  (printf "*externally-unproductive-trigger-counter*: ~s\n"
-          *externally-unproductive-trigger-counter*)
+  (printf "*externally-productive-trigger-counter*: ~s\n" *externally-productive-trigger-counter*)
+  (printf "*externally-unproductive-trigger-counter*: ~s\n" *externally-unproductive-trigger-counter*)
   (printf "*user-counter*: ~s\n" *user-counter*))
 
 ;;; Goal that increments *user-counter* for ad-hoc instrumentation.
@@ -409,8 +407,9 @@
   (lambda (st)
     (let ([d^ (+ 1 (state-D st))])
       (if (> d^ (*main-unsound-depth*))
-          (begin (increment-counter! *main-unsound-depth-cutoff-counter*)
-                 #f)
+          (begin
+            (increment-counter! *main-unsound-depth-cutoff-counter*)
+            #f)
           (let ([st (state-with-D st d^)])
             (let ([fc^ (+ 1 (state-FC st))])
               (if (>= fc^ (*check-follower-every*))
@@ -460,12 +459,14 @@
       (check-type $ inf/d?)
       (case-inf/d $
         [() #f]
-        [(c^) (begin
-                (tally-productivity! before-walked t c^)
-                (state-with-F c^ #f))]
-        [(c^ f^) (begin
-                   (tally-productivity! before-walked t c^)
-                   (state-with-F c^ (cons f^ t)))]))))
+        [(c^)
+         (begin
+           (tally-productivity! before-walked t c^)
+           (state-with-F c^ #f))]
+        [(c^ f^)
+         (begin
+           (tally-productivity! before-walked t c^)
+           (state-with-F c^ (cons f^ t)))]))))
 
 (define (tally-productivity! before-walked t c^)
   (let ([after-walked (walk* t (state-S c^))])
