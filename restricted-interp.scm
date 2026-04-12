@@ -1,6 +1,6 @@
-; Relational interpreter emulating ideas from "Type-and-example-directed program synthesis"
-; by 	Peter-Michael Osera	and Steve Zdancewic (http://dl.acm.org/citation.cfm?id=2738007)
-; From https://github.com/michaelballantyne/scheme-workshop-2015
+;; Relational interpreter emulating ideas from "Type-and-example-directed program synthesis"
+;; by 	Peter-Michael Osera	and Steve Zdancewic (http://dl.acm.org/citation.cfm?id=2738007)
+;; From https://github.com/michaelballantyne/scheme-workshop-2015
 
 (define empty-env '())
 

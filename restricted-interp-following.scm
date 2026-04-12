@@ -1,6 +1,7 @@
-; Relational interpreter emulating ideas from "Type-and-example-directed program synthesis"
-; by 	Peter-Michael Osera	and Steve Zdancewic (http://dl.acm.org/citation.cfm?id=2738007)
-; From https://github.com/michaelballantyne/scheme-workshop-2015
+;; A variant of the interprerter in restricted-interp.scm, adapted to use the determinacy-directed
+;; /d versions of the miniKanren forms, for use in follower goals. Comments note implementation
+;; changes required vs the original beyond the basic split of conde clause elements into guards
+;; and bodies.
 
 (define empty-env/d '())
 
@@ -57,7 +58,7 @@
      [(==/d `(,x . ,dx*) x*)
       (==/d `(,a . ,da*) a*)
       (==/d `(,t . ,dt*) t*)
-      ;; NB: unifies `out` (not env2) in the guard so that when `out`
+      ;; Unifies `out` (not env2) in the guard so that when `out`
       ;; is ground the clause can commit immediately. This reverses the
       ;; accumulation direction vs. ext-env*o; see interp-d-adaptations
       ;; design note. Semantically equivalent given the absento/d below.
@@ -92,7 +93,7 @@
      [(eval-expo/d e1 env v1 'I 'number) (eval-expo/d e2 env v2 'I 'list)])
     ([rator x* rands body env^ a* at* res]
      [(==/d `(,rator . ,rands) expr)
-      ;; NB: the plain interp relies on recursive eval of rator to
+      ;; The plain interp relies on recursive eval of rator to
       ;; fail when rator is a syntactic keyword. Here the recursive
       ;; eval is in the body, so we must disambiguate eagerly in the
       ;; guard. See interp-d-adaptations design note.
