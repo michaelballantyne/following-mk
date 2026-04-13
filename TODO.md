@@ -41,3 +41,5 @@
 - Enhance test-check to give us a summary at the end of test-all.scm.
 
 - Experiment with separate interpreter and typechecker for the same language. Can they work together? Which should be first to act as leader?
+
+- Experiment / validate / write about: I think that the reasoning here is stronger than in some other alternatives I've considered that try to watch and figure out when to resume. The issue is that a guard can have multiple different unifications / constraints, and any variable involved in any of them changing could make the guard fail and the whole conde determinate. So if you wanted to watch, you'd have to trial execute the entirety of every guard in every top-level conde and see all the variables that got constrained in every one of them. And you might also have to do that in the guards of every conde executed in a guard of the outer conde and so on going down. So there likely isn't a small cheap set of variables to watch!
