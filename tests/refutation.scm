@@ -77,7 +77,7 @@
         ((== q 'l)))))
   '(l))
 
-(test "refute wrong match base case"
+(test "refute wrong base case"
   (run* (q)
     (follower
       q

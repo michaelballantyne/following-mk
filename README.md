@@ -109,7 +109,7 @@ restricted-interp-following.scm   /d version of the same interpreter
 test-all.scm                      loads and runs all test files
 tests/determinacy-goal-forms.scm  /d primitives: conde/d, fresh/d, conjunction, depth
 tests/following-interpreter.scm   evalo/d: ground eval, partial eval, suspend/resume
-tests/finite-refutation.scm       follower refutation with finite candidate sets
+tests/refutation.scm              follower refutation with finite candidate sets
 tests/leading-following.scm       leader (evalo) + follower (evalo/d) interaction
 synthesis/                        synthesis benchmarks (drive via run.sh)
 run.sh                            driver for synthesis experiments
