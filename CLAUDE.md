@@ -36,8 +36,8 @@ lives at `.fmt.rkt` and teaches the formatter about this repo's forms:
 Reformat in place:
 
 ```
-raco fmt -i following.scm restricted-interp.scm restricted-interp-following.scm \
-           tests/*.scm synthesis/*.scm experiments/*.scm ex*.scm
+raco fmt -i following.scm views.scm restricted-interp*.scm \
+           tests/*.scm synthesis/*.scm experiments/*.scm
 ```
 
 Preview without writing:
@@ -50,7 +50,8 @@ raco fmt following.scm
 
 Claude Code works independently on this project on the `claude-independent`
 branch. This is open-ended research in service of the project's goal — see
-the research-goal framing in [`README.md`](README.md) and `TODO.md`. The unit
+the research-goal framing in [`README.md`](README.md) and the status header
+of [`BACKLOG.md`](BACKLOG.md). The unit
 of progress is a **resolved question** (a hypothesis measured, a mechanism
 understood, a sharp corner documented or fixed), not a shipped feature.
 Direction can and should evolve from what's learned — there's no fixed finish
@@ -70,8 +71,8 @@ root — open questions and experiments (Now / Next / Later / Resolved), 10–20
 open items. An item resolves when answered *either way* ("this helps" and
 "this doesn't help, here's why" are both resolutions); move it to Resolved
 with a one-line answer and a link to the `claude/` entry with details. If the
-backlog runs dry, generate the next round from recent notebook entries and
-`TODO.md` rather than treating empty as a stopping point.
+backlog runs dry, generate the next round from recent notebook entries rather
+than treating empty as a stopping point.
 
 **Reflect and re-prioritize periodically.** Backlog items are not evergreen —
 what looked worth doing a few findings ago is often stale now. Every several

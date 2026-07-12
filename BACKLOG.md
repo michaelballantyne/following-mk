@@ -131,7 +131,11 @@ views, coverage) are parked in Next behind broadening.
   (symbolo/=/= etc.) are invisible to the walk*-based check — B2-ce1
   scored 221k/221k triggers "unproductive" while doubling main-search
   work. Diff the constraint store too. Until then, don't trust
-  "trigger productive" as the propagation signal.
+  "trigger productive" as the propagation signal. Related open
+  question (from old TODO): when the follower forces/fails, does the
+  leader actually avoid the equivalent work, or does the store-level
+  communication under-cut goal-level exploration? Worth a targeted
+  measurement once the tally is trustworthy.
 
 - [ ] **Broaden the synthesis benchmark suite** (endorsed by Michael
   2026-07-12; `duplicate` in progress as the third task). Within the
@@ -162,7 +166,11 @@ views, coverage) are parked in Next behind broadening.
 - [ ] **Document the /d sharp corners + follower guarantees note**
   (unchanged): recursion not through conde/d diverges under fresh/d;
   end-of-run trigger doesn't force suspended followers; the intended
-  `(run n (q) (follower q g/d) g)` pattern.
+  `(run n (q) (follower q g/d) g)` pattern. Fold in from old TODO:
+  document the conj/d-disj/d implementation and its refutation
+  capabilities, and the hard-suspend-at-depth vs resumable-suspend
+  convergence argument (refining resumptions don't refresh the depth
+  budget; only the top-level resume of a hard suspend does).
 
 ## Later / ideas
 
@@ -192,8 +200,19 @@ views, coverage) are parked in Next behind broadening.
   story, partially subsumed by the size guarantee under ID.
 - **Asymmetric leader/follower setups** — diagnostic instruments only
   (the product is symmetric by construction).
+- **Relational-substrate related-work note** (from old TODO; the
+  synthesis-systems survey covers the PBE world but not the mk
+  lineage): dKanren (Rosenblatt), Lozov's relational conversion
+  papers, backjumping-miniKanren, underconstraints, the condg lineage
+  from staged-mk (and whether the latest staged-mk approach removes
+  the /d syntactic overhead), Andorra/EAM contrast — plus worked
+  examples of *limitations*: things CDCL or Lozov's machinery
+  terminates on that following-mk does not (fair conjunction vs
+  complete unit propagation).
 - Name/document the inf/d return type; rename `case-inf/d`/`stream`.
-- Verify set-var-val! is genuinely disabled on the /d path.
+- Verify set-var-val! is genuinely disabled on the /d path (and the
+  old-TODO question of removing it entirely — Will thinks it has
+  negative ecosystem value; maybe upstream-first).
 - Remove `*unsound-fail-depth*`? Still unused. And with rungs 1+2,
   `*main-unsound-depth*` never fires on the benchmark suite either
   (depth-cut 0) — both unsound knobs are now candidates for demotion
