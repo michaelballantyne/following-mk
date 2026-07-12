@@ -22,10 +22,19 @@
 ;;                                   body, which yields (6 5 7 8) here.
 ;; A 3-element case (5 6 7)->(6 5 7) would additionally exercise an odd leftover
 ;; INSIDE the recursion; it is not separately pinned here (the 4-element case
-;; already forces the recursive call), so a smaller body that happens to agree
-;; on these four inputs is conceivable but not expected -- noted rather than
-;; chased.  Absento excludes example constants 5,6,7,8; the canonical body has
-;; no numeric literals.
+;; already forces the recursive call).  Absento excludes example constants
+;; 5,6,7,8; the canonical body has no numeric literals.
+;;
+;; MEASURED OUTCOME (2026-07-12, first full-stack run): the search found a
+;; SMALLER fully-correct program at size 63 / bound 63:
+;;   (match l ['() l] [(cons a d) (match d ['() l]
+;;                      [(cons b dd) (cons b (cons a (swap dd)))])])
+;; -- both base cases return `l` itself (within each recursive invocation, l IS
+;; that invocation's argument), avoiding the '() literal and the (cons a '())
+;; rebuild.  Correct on all inputs, verified by hand on nil/singleton/odd/even
+;; cases.  So the human "canonical" above is NOT minimal; the machine answer is.
+;; Kept the header canonical for the gates (it must still be ACCEPTED by all
+;; views), but expected answer bound is 63, not 75.
 ;;
 ;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/swap-full-id-tv4ex.scm
 (load "experiments/id-harness.scm")

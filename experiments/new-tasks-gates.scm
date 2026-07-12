@@ -98,6 +98,8 @@
   (run 1 (v) (evalo (evens-prog evens-canon '(evens (cons 5 (cons 6 '())))) v)) '((5)))
 (test "EVAL evens ex4 (evens (5 6 7))=(5 7)"
   (run 1 (v) (evalo (evens-prog evens-canon '(evens (cons 5 (cons 6 (cons 7 '()))))) v)) '((5 7)))
+(test "EVAL evens ex5 (evens (5 6 7 8))=(5 7)"
+  (run 1 (v) (evalo (evens-prog evens-canon '(evens (cons 5 (cons 6 (cons 7 (cons 8 '())))))) v)) '((5 7)))
 (test "EVAL evens WRONG (evens (5 6)) /= (5 6)"
   (run 1 (v) (evalo (evens-prog evens-canon '(evens (cons 5 (cons 6 '())))) '(5 6))) '())
 
