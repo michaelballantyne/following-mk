@@ -206,6 +206,7 @@
   (set! *suspend-depth-cutoff-counter* 0)
   (set! *main-unsound-depth-cutoff-counter* 0)
   (set! *size-cutoff-counter* 0)
+  (set! sample-term-counter 0)
   ;; Don't let a watched term set by an earlier run leak into a later one.
   (*size-watched-term* #f)
   (set! *==-counter* 0)
@@ -714,7 +715,27 @@
           (begin
             (increment-counter! *size-cutoff-counter*)
             #f)
-          (main-conde-hook-rest st)))))
+          (begin
+            (sample-watched-term! watched st)
+            (main-conde-hook-rest st))))))
+
+;;; When *sample-term-every* is a number N and a term is being watched,
+;;; print the reified watched term on every Nth surviving main-conde
+;;; entry, tagged with the current size bound. For sampling the candidate
+;;; population the search explores at each ID level. Off (#f) by default.
+(define *sample-term-every* (make-parameter #f))
+
+(define sample-term-counter 0)
+
+(define (sample-watched-term! watched st)
+  (let ([se (*sample-term-every*)])
+    (when (and se watched)
+      (set! sample-term-counter (+ 1 sample-term-counter))
+      (when (>= sample-term-counter se)
+        (set! sample-term-counter 0)
+        (printf "[CAND bound=~a] ~s\n"
+                (*max-term-size*)
+                ((reify watched) (state-with-scope st (new-scope))))))))
 
 (define (main-conde-hook-rest st)
   (let ([d^ (+ 1 (state-D st))])
