@@ -736,7 +736,9 @@
         (set! sample-term-counter 0)
         (printf "[CAND bound=~a] ~s\n"
                 (*max-term-size*)
-                ((reify watched) (state-with-scope st (new-scope))))))))
+                (without-unify-counting
+                 (lambda ()
+                   ((reify watched) (state-with-scope st (new-scope))))))))))
 
 (define (main-conde-hook-rest st)
   (let ([d^ (+ 1 (state-D st))])
@@ -761,7 +763,11 @@
       (if F
           (begin
             (when (*print-follower-term*)
-              (let ([t (cdr F)]) (printf "~s\n" ((reify t) (state-with-scope st (new-scope))))))
+              (let ([t (cdr F)])
+                (printf "~s\n"
+                        (without-unify-counting
+                         (lambda ()
+                           ((reify t) (state-with-scope st (new-scope))))))))
             (run-and-set-follower F st))
           st))))
 
@@ -800,6 +806,19 @@
       (set! *in-follower-eval?* #f)
       result)))
 
+;; Run thunk without letting its internal unifications pollute the work
+;; counters. mk.scm's reify is NOT unify-free -- constraint reification
+;; runs subsumption checks that call unify -- so instrumentation-only
+;; reification must be excluded from the metric it feeds. (Found when a
+;; committed experiment total jumped 8x with identical conde counts.)
+(define (without-unify-counting thunk)
+  (let ([m *main-unify-counter*]
+        [f *follower-unify-counter*])
+    (let ([v (thunk)])
+      (set! *main-unify-counter* m)
+      (set! *follower-unify-counter* f)
+      v)))
+
 ;; A trigger is "productive" if it changed the *reified* watched term --
 ;; reification projects the constraint store onto variables reachable
 ;; from the term, so constraint-only commits (symbolo, =/=, absento on
@@ -807,7 +826,9 @@
 ;; such commits "unproductive" even when they measurably perturbed the
 ;; main search (see claude/2026-07-12-184500-termination-view-results.md).
 (define (reify-for-tally t st)
-  ((reify t) (state-with-scope st (new-scope))))
+  (without-unify-counting
+   (lambda ()
+     ((reify t) (state-with-scope st (new-scope))))))
 
 (define (tally-productivity! before-reified t c^)
   (let ([after-reified (reify-for-tally t c^)])
