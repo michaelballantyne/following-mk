@@ -66,12 +66,17 @@ views, coverage) are parked in Next behind broadening.
   decrease across all arguments; lexicographic orders over argument
   permutations. Gate on interleave + all existing canonicals.
 
-- [ ] **Benchmark wave 2**: (a) sample the surviving streams of the
-  wave-1 tasks (standing practice; queued behind the untyped+TY
-  port so we sample the architecture we keep); (b) the
-  differentiating class — bidirectionality-essential tasks
-  (backward/partial-output specs, relation synthesis, Barliman-style)
-  where enumerate-and-test has no natural entry.
+- [ ] **Benchmark wave 2: bidirectionality-essential tasks** — the
+  priority-2 item of the reflection
+  (`...-220000-reflection-after-factoring-and-wave1.md`): identity #1
+  is unexercised by all nine current tasks, and backward/partial-
+  output specs should flip the follower from mostly-refuting to
+  forcing. Design the spec class (run-backward queries, partial
+  outputs, relation synthesis, Barliman-style), then fold into its
+  measurement pass: (a) untyped+TY port of wave 1, (b) surviving-
+  stream sampling (standing practice), (c) **symbolic/parametric
+  examples** (survey #1 — itself a richer-spec mechanism, and the
+  structural fix for the evens-style spec failure).
 
 
 - [ ] **Rung 4: canonicity + relevance views.** Post-3-views stream
@@ -109,13 +114,6 @@ views, coverage) are parked in Next behind broadening.
   opener.
 
 ## Next
-
-- [ ] **Symbolic/parametric examples** (info-sources survey #1,
-  `claude/2026-07-12-210000-info-sources-survey.md`): examples with
-  fresh vars + =/=/absento — class A, nearly free, supplies the
-  missing same-l/different-e information; refutation up, forcing
-  possibly down (=-on-symbolic stalls). Parked behind benchmark
-  broadening per directive.
 
 - [ ] **Length-domain abstract view** (survey #2): eval-lengtho/d
   over auto-abstracted examples; dense-forcing hypothesis on
