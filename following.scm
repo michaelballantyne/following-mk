@@ -124,12 +124,13 @@
 (define *fail-counter* 0)
 (define *singleton-succeed-counter* 0)
 (define *non-singleton-succeed-counter* 0)
-;; A follower trigger is "externally productive" if walking the
-;; follower's term under the post-trigger substitution differs from
-;; walking it under the pre-trigger substitution -- i.e. the trigger
-;; committed at least one new binding visible to the outer search via
-;; a variable reachable from the term.  Internal fresh-var bindings
-;; don't count.
+;; A follower trigger is "externally productive" if the *reified*
+;; follower term differs before vs after the trigger -- i.e. the trigger
+;; committed a new binding OR a new constraint (=/=, symbolo, absento,
+;; ...) visible on a variable reachable from the term.  Internal
+;; fresh-var bindings don't count.  (Reified, not just walked: see
+;; claude/2026-07-12-184500-termination-view-results.md for the
+;; constraint-only commits the walk-based tally missed.)
 (define *externally-productive-trigger-counter* 0)
 (define *externally-unproductive-trigger-counter* 0)
 (define *user-counter* 0)
@@ -767,7 +768,7 @@
 (define (run-and-set-follower F st)
   (let ([g (car F)]
         [t (cdr F)]
-        [before-walked (walk* (cdr F) (state-S st))])
+        [before-reified (reify-for-tally (cdr F) st)])
     ;; Mark unifications performed during the follower goal invocation (and
     ;; the case-inf/d dispatch over its result) as follower work, so mk.scm's
     ;; unify counter attributes them to *follower-unify-counter*. The follower
@@ -784,23 +785,32 @@
                [(c^)
                 (begin
                   (increment-counter! *singleton-succeed-counter*)
-                  (tally-productivity! before-walked t c^)
+                  (tally-productivity! before-reified t c^)
                   (state-with-F c^ #f))]
                [(c^ f^)
                 (begin
                   (increment-counter! *non-singleton-succeed-counter*)
-                  (tally-productivity! before-walked t c^)
+                  (tally-productivity! before-reified t c^)
                   (state-with-F c^ (cons f^ t)))]
                [(ch fh)
                 (begin
                   (increment-counter! *non-singleton-succeed-counter*)
-                  (tally-productivity! before-walked t ch)
+                  (tally-productivity! before-reified t ch)
                   (state-with-F ch (cons fh t)))]))])
       (set! *in-follower-eval?* #f)
       result)))
 
-(define (tally-productivity! before-walked t c^)
-  (let ([after-walked (walk* t (state-S c^))])
-    (if (equal? before-walked after-walked)
+;; A trigger is "productive" if it changed the *reified* watched term --
+;; reification projects the constraint store onto variables reachable
+;; from the term, so constraint-only commits (symbolo, =/=, absento on
+;; term vars) count as productive. The old walk*-only comparison scored
+;; such commits "unproductive" even when they measurably perturbed the
+;; main search (see claude/2026-07-12-184500-termination-view-results.md).
+(define (reify-for-tally t st)
+  ((reify t) (state-with-scope st (new-scope))))
+
+(define (tally-productivity! before-reified t c^)
+  (let ([after-reified (reify-for-tally t c^)])
+    (if (equal? before-reified after-reified)
         (increment-counter! *externally-unproductive-trigger-counter*)
         (increment-counter! *externally-productive-trigger-counter*))))
