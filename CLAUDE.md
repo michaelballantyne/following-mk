@@ -89,7 +89,16 @@ ever wanted back.
 **Working until session end.** Check for a `SESSION_END` file in the repo
 root. If it exists, you're in independent mode: it holds a UTC unix timestamp
 (`date -u +%s`) deadline, the user is not watching, and you work autonomously
-until `date -u +%s` exceeds it. A clean result (positive or negative) or a
+until `date -u +%s` exceeds it.
+
+**Check the clock; don't infer it.** Your subjective sense of elapsed time
+tracks your own activity, not the wall clock — a dense burst of tool calls
+feels like hours and an idle wait feels like minutes, and both are usually
+wrong. Before any deadline-sensitive decision (wrapping up early, declining
+to start something "too big", sizing a timeout, scheduling a check-in), run
+`date -u` and compute the actual remaining time against `SESSION_END`.
+Cheap to check, expensive to guess wrong in either direction: phantom time
+pressure truncates good work, and phantom slack strands it unfinished. A clean result (positive or negative) or a
 commit is **not** a stopping point — write it up, update the backlog, pick up
 the next question. Don't ask the user questions in this mode; make your best
 judgment and record it (in the notebook for an experiment call, in a `claude/`
