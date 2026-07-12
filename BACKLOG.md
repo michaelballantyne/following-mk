@@ -54,7 +54,12 @@ performance gains. Fair work metric: `unify (main)` / `conde (main)`
   show it";
   (b) an **asymmetry-controlled family** — same task, varying which
   examples the follower holds vs the leader (systematizing the ex2 /
-  rember-2 regime that produced the only clear wins).
+  rember-2 regime that produced the only clear wins). Note (Michael,
+  2026-07-12): the product vision is *symmetric by construction* —
+  leader and follower generated from one source, the user writes plain
+  miniKanren and gets unit propagation under the hood. Asymmetric
+  setups are diagnostic instruments for locating where the value comes
+  from, not a direction.
 
 ## Next
 
