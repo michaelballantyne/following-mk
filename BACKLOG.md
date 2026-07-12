@@ -41,6 +41,15 @@ optimization. Mere-inefficiency overhead stays out of scope.
 
 ## Now
 
+- [ ] **Ablation follow-ups** (`experiments/ablation.md`, keep it
+  current as limiters/tasks arrive): (a) is TY worth keeping? Fully
+  overlapped on refutation (LOO-TY ≈ full everywhere) but uniquely
+  *forces* — find where forcing pays or drop it from the default
+  stack; (b) rung 4b occurs/relevance view (design in the session-close
+  note: occurso/d path-OR, num-holes die free); (c) 4a extension for
+  branch-value vacuity `(if (= x e) x e)` (~11% of residue).
+
+
 - [ ] **Rung 4: canonicity + relevance views.** Post-3-views stream
   spot check (rember levels 35-43): ~33% is vacuous-condition
   boilerplate `(if (= X X) ...)` (dead else; equivalent smaller
