@@ -16,6 +16,13 @@
 set -e
 cd "$(dirname "$0")"
 
+# Chez binary: prefer $CHEZ, then `chez`, then Debian/Ubuntu's `chezscheme`.
+CHEZ="${CHEZ:-$(command -v chez || command -v chezscheme || true)}"
+if [[ -z $CHEZ ]]; then
+  echo "run.sh: no Chez Scheme binary found (tried \$CHEZ, chez, chezscheme)" >&2
+  exit 1
+fi
+
 FAIL_DEPTH=
 SUSPEND_DEPTH=
 MAIN_DEPTH=
@@ -67,7 +74,7 @@ trap 'rm -f "$tmp"' EXIT
 } > "$tmp"
 
 if [[ -n $TIMEOUT ]]; then
-  chez --script "$tmp" &
+  "$CHEZ" --script "$tmp" &
   chez_pid=$!
   sleep "$TIMEOUT" &
   sleep_pid=$!
@@ -89,5 +96,5 @@ if [[ -n $TIMEOUT ]]; then
   wait "$sleep_pid" 2>/dev/null
   exit "$rc"
 else
-  chez --script "$tmp"
+  "$CHEZ" --script "$tmp"
 fi
