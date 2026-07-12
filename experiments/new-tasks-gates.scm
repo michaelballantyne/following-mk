@@ -26,7 +26,7 @@
 (define (last-prog q body)
   `(letrec ([last (lambda (l) : ((list) -> number) ,q)]) ,body))
 (define last-tyenv '((last . ((list) -> number)) (l . list)))
-(define last-canon '(match l ['() 0] [(cons a d) (match d ['() a] [(cons b dd) (last dd)])]))
+(define last-canon '(match l ['() 0] [(cons a d) (match d ['() a] [(cons b dd) (last d)])]))
 
 (define (swap-prog q body)
   `(letrec ([swap (lambda (l) : ((list) -> list) ,q)]) ,body))

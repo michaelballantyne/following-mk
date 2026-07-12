@@ -6,7 +6,7 @@
 ;;
 ;; Canonical body (answer):
 ;;   (match l ['() 0]
-;;     [(cons a d) (match d ['() a] [(cons b dd) (last dd)])])
+;;     [(cons a d) (match d ['() a] [(cons b dd) (last d)])])
 ;; Size under the repo measure (pattern-binders a,d,b,dd = 0): 50.
 ;; Expected answer at bound 51 (bounds 19..55 step 4; 50 first lands on the
 ;; grid at 51).
