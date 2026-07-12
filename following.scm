@@ -138,6 +138,69 @@
   (syntax-rules ()
     [(_ c) (set! c (add1 c))]))
 
+;;; --- per-conde/d-site depth tally (lightweight tracing)
+;;;
+;;; Each conde/d call site carries a source label (see the conde/d macro).
+;;; Three tables keyed by that label let us attribute suspend-depth cutoffs
+;;; to the specific /d relation that drives the deep unfolding:
+;;;   *entries-by-label*  -- every conde/d-runtime evaluation attempt
+;;;   *cutoffs-by-label*  -- every suspend-depth cutoff fired at that site
+;;;   *maxdepth-by-label* -- max suspend-depth observed at entry to that site
+;;; Nothing prints unless print-depth-tally! is called explicitly.
+
+(define *entries-by-label* (make-hashtable string-hash string=?))
+(define *cutoffs-by-label* (make-hashtable string-hash string=?))
+(define *maxdepth-by-label* (make-hashtable string-hash string=?))
+
+(define (hashtable-bump! ht key)
+  (hashtable-update! ht key add1 0))
+
+(define (hashtable-max! ht key v)
+  (hashtable-update! ht key (lambda (old) (max old v)) 0))
+
+(define (record-depth-entry! label suspend-depth)
+  (hashtable-bump! *entries-by-label* label)
+  (hashtable-max! *maxdepth-by-label* label suspend-depth))
+
+(define (record-depth-cutoff! label)
+  (hashtable-bump! *cutoffs-by-label* label))
+
+(define (reset-depth-tally!)
+  (hashtable-clear! *entries-by-label*)
+  (hashtable-clear! *cutoffs-by-label*)
+  (hashtable-clear! *maxdepth-by-label*))
+
+;;; Print the per-site tally: every site that fired at least one suspend
+;;; cutoff (sorted by cutoff count descending), plus the top ~10 sites by
+;;; entry count.  Columns: label, entries, cutoffs, max-depth-at-entry.
+(define (print-depth-tally!)
+  (let* ([labels (vector->list (hashtable-keys *entries-by-label*))]
+         [entries (lambda (l) (hashtable-ref *entries-by-label* l 0))]
+         [cutoffs (lambda (l) (hashtable-ref *cutoffs-by-label* l 0))]
+         [maxdepth (lambda (l) (hashtable-ref *maxdepth-by-label* l 0))]
+         [with-cutoffs (list-sort (lambda (a b) (> (cutoffs a) (cutoffs b)))
+                                  (filter (lambda (l) (> (cutoffs l) 0)) labels))]
+         [by-entries (list-sort (lambda (a b) (> (entries a) (entries b))) labels)]
+         [top-entries (let loop ([xs by-entries] [n 10])
+                        (if (or (null? xs) (= n 0)) '() (cons (car xs) (loop (cdr xs) (- n 1)))))]
+         ;; union: cutoff rows first, then any top-entry rows not already shown
+         [rows (append with-cutoffs
+                       (filter (lambda (l) (not (member l with-cutoffs))) top-entries))])
+    (if (null? rows)
+        (printf "  (depth tally empty)\n")
+        (let* ([label-w (apply max (string-length "site") (map string-length rows))]
+               [lcol (lambda (s w) (string-append s (make-string (max 0 (- w (string-length s))) #\space)))]
+               [rcol (lambda (s w) (string-append (make-string (max 0 (- w (string-length s))) #\space) s))])
+          (printf "  ~a  ~a  ~a  ~a\n"
+                  (lcol "site" label-w) (rcol "entries" 7) (rcol "cutoffs" 7) (rcol "max-depth" 9))
+          (for-each (lambda (l)
+                      (printf "  ~a  ~a  ~a  ~a\n"
+                              (lcol l label-w)
+                              (rcol (number->string (entries l)) 7)
+                              (rcol (number->string (cutoffs l)) 7)
+                              (rcol (number->string (maxdepth l)) 9)))
+                    rows)))))
+
 (define (reset-counters!)
   (set! *unsound-fail-depth-cutoff-counter* 0)
   (set! *suspend-depth-cutoff-counter* 0)
@@ -159,7 +222,8 @@
   (set! *non-singleton-succeed-counter* 0)
   (set! *externally-productive-trigger-counter* 0)
   (set! *externally-unproductive-trigger-counter* 0)
-  (set! *user-counter* 0))
+  (set! *user-counter* 0)
+  (reset-depth-tally!))
 
 (define counter-descriptors
   (list (cons "unify (main)"
@@ -399,7 +463,7 @@
             (((g (+ unsound-fail-depth 1)) suspend-depth) st))))))
 
 ;; Soundly suspend when reaching *suspend-depth*.
-(define (check-suspend-depth g-on-fallback-thunk g)
+(define (check-suspend-depth label g-on-fallback-thunk g)
   (lambda (suspend-depth)
     (check-type suspend-depth number?)
     (lambda (st)
@@ -407,6 +471,7 @@
       (if (> suspend-depth (*suspend-depth*))
           (begin
             (increment-counter! *suspend-depth-cutoff-counter*)
+            (record-depth-cutoff! label)
             (make-hard-suspended st (g-on-fallback-thunk)))
           ((g (+ suspend-depth 1)) st)))))
 
@@ -416,12 +481,47 @@
                  stx)
   (syntax-case stx ()
     [(_ ((x ...) (g ...) (b ...)) ...)
-     #`(check-unsound-fail-depth
-        (lambda (unsound-fail-depth)
-          (check-type unsound-fail-depth number?)
-          (letrec ([conde/d-g
-                    (conde/d-runtime
-                     (list (lambda (suspend-depth)
+     (let ()
+       ;; Source label for this call site, computed at expansion time and
+       ;; embedded as a literal string.  Prefer the syntax annotation
+       ;; ("basename:line"); if absent, fall back to the leading operator
+       ;; symbols of the first clause's guards.
+       (define (basename p)
+         (let loop ([i (- (string-length p) 1)])
+           (cond
+             [(< i 0) p]
+             [(char=? (string-ref p i) #\/) (substring p (+ i 1) (string-length p))]
+             [else (loop (- i 1))])))
+       (define (fallback-label)
+         (let* ([clauses (syntax->datum #'((g ...) ...))]
+                [first-clause (if (null? clauses) '() (car clauses))]
+                [ops (map (lambda (form) (if (pair? form) (car form) form)) first-clause)])
+           (string-append "conde/d?["
+                          (if (null? ops)
+                              ""
+                              (fold-left (lambda (acc s) (string-append acc "," (format "~a" s)))
+                                         (format "~a" (car ops))
+                                         (cdr ops)))
+                          "]")))
+       (define ann (syntax->annotation stx))
+       (define label
+         (if ann
+             (let* ([src (annotation-source ann)]
+                    [sfd (source-object-sfd src)]
+                    [path (source-file-descriptor-path sfd)]
+                    [bfp (source-object-bfp src)]
+                    [loc (call-with-values (lambda () (locate-source sfd bfp #t)) list)])
+               (if (>= (length loc) 2)
+                   (string-append (basename path) ":" (number->string (cadr loc)))
+                   (string-append (basename path) "@" (number->string bfp))))
+             (fallback-label)))
+       #`(check-unsound-fail-depth
+          (lambda (unsound-fail-depth)
+            (check-type unsound-fail-depth number?)
+            (letrec ([conde/d-g
+                      (conde/d-runtime
+                       #,label
+                       (list (lambda (suspend-depth)
                              (check-type suspend-depth number?)
                              (lambda (st)
                                (check-type st state?)
@@ -435,10 +535,11 @@
                                               st)))))))) ...)
                      (lambda ()
                        conde/d-g))])
-            conde/d-g)))]))
+              conde/d-g))))]))
 
-(define (conde/d-runtime clauses g-thunk)
+(define (conde/d-runtime label clauses g-thunk)
   (check-suspend-depth
+   label
    g-thunk
    (lambda (suspend-depth)
      (check-type suspend-depth number?)
@@ -446,6 +547,7 @@
        (define (nondeterministic)
          (check-type (cons st (g-thunk)) inf/d?))
        (increment-counter! *conde/d-counter*)
+       (record-depth-entry! label suspend-depth)
        (check-type st state?)
        (let ([st (state-with-scope st (new-scope))]) ;; for set-var-val at choice point entry
          (let loop ([clauses clauses]
