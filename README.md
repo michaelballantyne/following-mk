@@ -88,11 +88,26 @@ through outer state, not inside the follower):
   every 10th conde" — less follower overhead, at the cost of firing
   later and possibly missing pruning opportunities.
 
-Two other parameters tune instrumentation:
+Two parameters implement a size-bounded main search (used by the
+iterative-deepening experiments in `experiments/`):
+
+- **`*max-term-size*`** — sound cutoff on the size of a watched term
+  (vars 0, atoms 1, pairs 1 + car + cdr — a monotone lower bound, so
+  branches whose watched term already exceeds the bound fail without
+  losing any answer within the bound). Default `+inf.0` (disabled).
+- **`*size-watched-term*`** — the term being bounded, installed by the
+  `(watch-size t)` goal (usually `(watch-size q)` first in a run).
+
+Instrumentation parameters:
 
 - **`*print-follower-term*`** — when true, every `trigger-followers` call
   prints the reified follower term. Useful for watching what the follower
   is narrowing down during search.
+- **`*sample-term-every*`** — when set to N (and a term is watched),
+  prints the reified watched term on every Nth surviving main-conde
+  entry, tagged with the current size bound. For sampling the candidate
+  population the search spends its work on; see the population-
+  composition notes in `claude/`.
 - `install-interrupt-counter-dump!` — not a parameter but a function.
   Call it to install a Ctrl-C handler that dumps the counter snapshot
   before exit. Opt-in because it replaces chez's default keyboard
@@ -112,8 +127,16 @@ tests/following-interpreter.scm   evalo/d: ground eval, partial eval, suspend/re
 tests/refutation.scm              follower refutation with finite candidate sets
 tests/leading-following.scm       leader (evalo) + follower (evalo/d) interaction
 synthesis/                        synthesis benchmarks (drive via run.sh)
+experiments/                      research experiments (drive via run.sh):
+                                    id-harness.scm       iterative deepening on term size
+                                    *-id-*.scm           size-closed synthesis arms
+                                    latin-square.scm     FD unit-propagation benchmark
+                                    termination-view.scm base-case-patho/d: a syntactic
+                                                         termination constraint composed
+                                                         into followers alongside evalo/d
+                                    *-seeded.scm         skeleton-seeded synthesis variants
 run.sh                            driver for synthesis experiments
-claude/                           design notes
+claude/                           design notes and dated research log
 ```
 
 Only three spots in `mk/mk.scm` are patched to support followers: the
