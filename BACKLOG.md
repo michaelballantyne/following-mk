@@ -45,7 +45,16 @@ optimization. Mere-inefficiency overhead stays out of scope.
   current as limiters/tasks arrive): (a) is TY worth keeping? Fully
   overlapped on refutation (LOO-TY ≈ full everywhere) but uniquely
   *forces* — find where forcing pays or drop it from the default
-  stack; (b) rung 4b occurs/relevance view (design in the session-close
+  stack. Diagnosis (Michael's question, confirmed): the interpreter is
+  a TYPED interpreter and also the generator, so type information is
+  spent at generation time; TY only sees the small window of
+  committed-but-not-yet-evaluated structure. Testable claim: a type
+  view pays in proportion to how untyped the generator is — try an
+  UNTYPED evalo variant and watch TY flip from useless to major.
+  Architectural corollary: factoring the typed interpreter into
+  untyped-evaluator view + type view carries the same information
+  with attributable contributions (identity #2 applied to the
+  interpreter itself); (b) rung 4b occurs/relevance view (design in the session-close
   note: occurso/d path-OR, num-holes die free); (c) 4a extension for
   branch-value vacuity `(if (= x e) x e)` (~11% of residue).
 
