@@ -16,28 +16,39 @@ search to the intended answer in rember-2. The leading hypothesis
 what keeps pruning from paying off: refuting a branch never *closes off*
 a subspace, it just redistributes scheduler slots size-disordered.
 
+Methodology update (2026-07-12, see
+`claude/2026-07-12-161259-search-order-constraint-relaxed.md`):
+perturbing the search order (size bounds, iterative deepening, etc.) is
+now in scope, under one rule — **every perturbed search order also runs
+without pruning as its own baseline**, so the follower's effect is
+isolated from the search-order effect. Steering is secondary to
+performance gains.
+
 ## Now
 
 - [ ] **Size-bounded search × follower — the central hypothesis test.**
   Implement a structural size bound on the query term (option 1 in
-  `claude/2026-04-12-search-order.md`: a `max-term-size` goal, applied
-  identically in the baseline and follower arms so the comparison stays
-  fair), and run iterative deepening on size over the rember/append
-  benchmarks. Measure pruning with the bound in place. Hypothesis: under
-  a size-closed search each refutation finishes a finite subspace, so the
-  follower's pruned fraction converts into real work savings — possibly
-  the orders-of-magnitude regime the goal asks for. Either outcome is a
-  major resolution: "yes, with the right search shape" redirects the
-  project to search strategy; "no, even size-bounded" says the ceiling is
-  refutation power itself (see the oracle item below).
+  `claude/2026-04-12-search-order.md`: a `max-term-size` goal), and run
+  iterative deepening on size over the rember/append benchmarks with
+  two arms per size bound: bounded search alone, and bounded search +
+  follower — the two-baseline rule from the 2026-07-12 direction note.
+  Hypothesis: under a size-closed search each refutation finishes a
+  finite subspace, so the follower's pruned fraction converts into real
+  work savings — possibly the orders-of-magnitude regime the goal asks
+  for. Either outcome is a major resolution: "yes, with the right search
+  shape" redirects the project to search strategy; "no, even
+  size-bounded" says the ceiling is refutation power itself (see the
+  oracle item below).
 
 - [ ] **A fair cross-arm work metric.** `*==-counter*` undercounts (mk
   internals bypass the wrapper) and `==` vs `==/d` aren't comparable.
-  Decide what "search work" means for magnitude claims — main-search
-  conde expansions? all unifications counted at `subst-add`/`walk`
-  level? — instrument it in both arms, and restate the ex2/ex3 numbers
-  in that metric. Prerequisite to trusting any headline number the Now
-  item above produces.
+  Plan: count where both arms share a code path — main-search conde
+  expansions, plus unifications ticked inside the unifier itself
+  (`unify`/`subst-add` level) rather than at the `==` wrapper —
+  and report both, with wall-clock recorded for context (it becomes the
+  target metric once the overhead phase starts). Restate the ex2/ex3
+  numbers in the new metric. Prerequisite to trusting any headline
+  number the item above produces.
 
 - [ ] **Where does the follower's deep unfolding come from?** Suspend-depth
   cutoffs still fire even with the grammar restrictions that were supposed
@@ -62,13 +73,6 @@ a subspace, it just redistributes scheduler slots size-disordered.
   comments), so the findings in `claude/2026-04-12-search-order.md`
   survive future changes and regressions are visible. (TODO item 1.)
 
-- [ ] **Characterize the steering effect.** rember-2 is the one clean
-  demonstrated win (follower finds `(rember e d)` where baseline finds a
-  nested-match trick). Map its shape: smallest hole that still exhibits
-  it, robustness across `check-every` ∈ {1, 10, 20}, and whether knobs
-  turn rember-full timeouts into steered successes. (Open questions from
-  `claude/2026-04-11-220000-rember-2-steering.md`.)
-
 - [ ] **Guard-robustness tests.** The soundness argument's load-bearing
   invariant is that `evaluate-guard` reports `'nondet` on any real
   ambiguity. Test the sharp cases: guards that diverge (depth limit as
@@ -83,6 +87,12 @@ a subspace, it just redistributes scheduler slots size-disordered.
 
 ## Later / ideas
 
+- Characterize the steering effect (rember-2 finds `(rember e d)` where
+  baseline finds a nested-match trick): smallest hole exhibiting it,
+  robustness across `check-every`, whether knobs turn rember-full
+  timeouts into steered successes. Demoted 2026-07-12: steering is
+  secondary to performance gains, but the answer-quality story is worth
+  having once the performance question is settled.
 - First-order representation of the /d search — better debuggability
   (printable trees), avoids rebuilding closure structure per trigger,
   and enables saving guard progress across triggers. Revisit after the
