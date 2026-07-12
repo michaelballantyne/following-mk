@@ -69,6 +69,27 @@
 
 (define *check-follower-every* (make-parameter 1))
 
+;;; --- size-bounded search parameters
+;;;
+;;; *max-term-size*: SOUND cutoff on the size of the watched term.  Each
+;;; main-search conde entry computes a size lower bound of the watched
+;;; term under the current substitution (see `term-size-lb`); if it
+;;; exceeds this bound the branch fails.  Because the lower bound is
+;;; monotone under substitution refinement (logic vars only ever gain
+;;; structure), failing when lb > bound never discards an answer of size
+;;; <= bound -- it is sound *with respect to the bounded search space*.
+;;; Used to drive iterative deepening on program size.  Default +inf.0
+;;; (disabled).
+;;;
+;;; *size-watched-term*: the term whose size is bounded, usually the
+;;; query var.  #f disables the check.  Set (not parameterized) by the
+;;; `watch-size` goal, and reset to #f by `reset-counters!` so a watched
+;;; term never leaks into a later run.
+
+(define *max-term-size* (make-parameter +inf.0))
+
+(define *size-watched-term* (make-parameter #f))
+
 ;;; When non-#f, `trigger-followers` prints the reified follower term each
 ;;; time it fires, so you can watch synthesis progress through the follower.
 (define *print-follower-term* (make-parameter #f))
@@ -89,6 +110,9 @@
 (define *unsound-fail-depth-cutoff-counter* 0)
 (define *suspend-depth-cutoff-counter* 0)
 (define *main-unsound-depth-cutoff-counter* 0)
+;; Main-search branches cut because the watched term's size lower bound
+;; exceeded *max-term-size* (bumped in main-conde-hook).
+(define *size-cutoff-counter* 0)
 (define *==-counter* 0)
 (define *==/d-counter* 0)
 ;; Main-search conde expansions: bumped once per invocation of the closure
@@ -118,6 +142,9 @@
   (set! *unsound-fail-depth-cutoff-counter* 0)
   (set! *suspend-depth-cutoff-counter* 0)
   (set! *main-unsound-depth-cutoff-counter* 0)
+  (set! *size-cutoff-counter* 0)
+  ;; Don't let a watched term set by an earlier run leak into a later one.
+  (*size-watched-term* #f)
   (set! *==-counter* 0)
   (set! *==/d-counter* 0)
   (set! *main-conde-counter* 0)
@@ -177,6 +204,9 @@
         (cons "cutoff: main unsound"
               (lambda ()
                 *main-unsound-depth-cutoff-counter*))
+        (cons "cutoff: size"
+              (lambda ()
+                *size-cutoff-counter*))
         (cons "user"
               (lambda ()
                 *user-counter*))))
@@ -212,6 +242,7 @@
            (let ([v (*check-follower-every*)]) (and (not (= v 1)) (format "check-every=~a" v)))
            (let ([v (*unsound-fail-depth*)]) (and (not (= v +inf.0)) (format "unsound-fail=~a" v)))
            (let ([v (*main-unsound-depth*)]) (and (not (= v +inf.0)) (format "main-unsound=~a" v)))
+           (let ([v (*max-term-size*)]) (and (not (= v +inf.0)) (format "max-term-size=~a" v)))
            (and (*print-follower-term*) "print-follower")))])
     (unless (null? parts)
       (printf "  [~a]\n"
@@ -225,6 +256,29 @@
   (lambda (st)
     (increment-counter! *user-counter*)
     st))
+
+;;; --- size-bounded search machinery
+
+;;; Goal that registers `t` as the term whose size is bounded by
+;;; *max-term-size* in the main-conde hook.  Mutates the parameter (not
+;;; a `parameterize`) so the setting persists across the whole run; the
+;;; state passes through unchanged.  Experiments call it as the first
+;;; goal of a run, e.g. (watch-size q).
+(define (watch-size t)
+  (lambda (st)
+    (*size-watched-term* t)
+    st))
+
+;;; Size lower bound of a walked term: an unbound logic var contributes
+;;; 0 (it may still refine to arbitrary structure), a non-pair atom 1,
+;;; and a pair 1 + size(car) + size(cdr).  Monotone under substitution
+;;; refinement, so `lb > bound => fail` never discards an answer of size
+;;; <= bound.  Expects an already-walked term (see main-conde-hook).
+(define (term-size-lb t)
+  (cond
+    [(var? t) 0]
+    [(pair? t) (+ 1 (term-size-lb (car t)) (term-size-lb (cdr t)))]
+    [else 1]))
 
 ;;; --- override == to count calls
 ;;;
@@ -550,16 +604,27 @@
 (define (main-conde-hook)
   (lambda (st)
     (increment-counter! *main-conde-counter*)
-    (let ([d^ (+ 1 (state-D st))])
-      (if (> d^ (*main-unsound-depth*))
+    (let ([watched (*size-watched-term*)]
+          [bound (*max-term-size*)])
+      (if (and watched
+               (not (= bound +inf.0))
+               (> (term-size-lb (walk* watched (state-S st))) bound))
           (begin
-            (increment-counter! *main-unsound-depth-cutoff-counter*)
+            (increment-counter! *size-cutoff-counter*)
             #f)
-          (let ([st (state-with-D st d^)])
-            (let ([fc^ (+ 1 (state-FC st))])
-              (if (>= fc^ (*check-follower-every*))
-                  ((trigger-followers) (state-with-FC st 0))
-                  (state-with-FC st fc^))))))))
+          (main-conde-hook-rest st)))))
+
+(define (main-conde-hook-rest st)
+  (let ([d^ (+ 1 (state-D st))])
+    (if (> d^ (*main-unsound-depth*))
+        (begin
+          (increment-counter! *main-unsound-depth-cutoff-counter*)
+          #f)
+        (let ([st (state-with-D st d^)])
+          (let ([fc^ (+ 1 (state-FC st))])
+            (if (>= fc^ (*check-follower-every*))
+                ((trigger-followers) (state-with-FC st 0))
+                (state-with-FC st fc^)))))))
 
 ;;; --- follower firing
 
