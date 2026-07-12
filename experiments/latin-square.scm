@@ -66,6 +66,31 @@
 (define solution-6 '(1 2 3 4 5 6 2 3 4 5 6 1 3 4 5 6 1 2
                      4 5 6 1 2 3 5 6 1 2 3 4 6 1 2 3 4 5))
 
+;; 8x8 propagation-solvable, 26 givens / 38 empty cells, clustered the same
+;; way as the 6x6 instance (top 3 rows have exactly 1 given each; givens
+;; get denser going down).  UNIQUE, naked-single solvable.  Constructed by
+;; taking the cyclic solution below, choosing this clustered given set, and
+;; verifying with a throwaway Python solver that (a) iterated naked-single
+;; propagation (row/col candidate elimination, force singletons, repeat)
+;; fills the whole board without stalling, and (b) exhaustive backtracking
+;; with forward checking finds exactly one solution.
+;;   . . . 4 . . . .        1 2 3 4 5 6 7 8
+;;   . . . 5 . . . .        2 3 4 5 6 7 8 1
+;;   . . 5 . . . . .        3 4 5 6 7 8 1 2
+;;   . 5 6 . . . . .   -->  4 5 6 7 8 1 2 3
+;;   . 6 . 8 1 2 3 .        5 6 7 8 1 2 3 4
+;;   . . 8 1 2 3 4 .        6 7 8 1 2 3 4 5
+;;   7 8 1 2 3 4 5 .        7 8 1 2 3 4 5 6
+;;   . 1 2 3 4 . . .        8 1 2 3 4 5 6 7
+(define givens-8-prop
+  '((3 . 4) (11 . 5) (18 . 5) (25 . 5) (26 . 6) (33 . 6) (35 . 8)
+    (36 . 1) (37 . 2) (38 . 3) (42 . 8) (43 . 1) (44 . 2) (45 . 3)
+    (46 . 4) (48 . 7) (49 . 8) (50 . 1) (51 . 2) (52 . 3) (53 . 4)
+    (54 . 5) (57 . 1) (58 . 2) (59 . 3) (60 . 4)))
+(define solution-8
+  '(1 2 3 4 5 6 7 8 2 3 4 5 6 7 8 1 3 4 5 6 7 8 1 2 4 5 6 7 8 1 2 3
+    5 6 7 8 1 2 3 4 6 7 8 1 2 3 4 5 7 8 1 2 3 4 5 6 8 1 2 3 4 5 6 7))
+
 ;;; =====================================================================
 ;;; Board geometry helpers (operate on a runtime list of the board's vars).
 ;;; =====================================================================
@@ -126,6 +151,8 @@
     [(4) (conde [(== c 1)] [(== c 2)] [(== c 3)] [(== c 4)])]
     [(5) (conde [(== c 1)] [(== c 2)] [(== c 3)] [(== c 4)] [(== c 5)])]
     [(6) (conde [(== c 1)] [(== c 2)] [(== c 3)] [(== c 4)] [(== c 5)] [(== c 6)])]
+    [(8) (conde [(== c 1)] [(== c 2)] [(== c 3)] [(== c 4)]
+                [(== c 5)] [(== c 6)] [(== c 7)] [(== c 8)])]
     [else (error 'gen-cell "unsupported N" N)]))
 
 ;; A generator for each NON-given cell (given cells are ==-bound already).
@@ -189,6 +216,16 @@
        ([] [(==/d c 4) (all-diff/d 4 peers)] [])
        ([] [(==/d c 5) (all-diff/d 5 peers)] [])
        ([] [(==/d c 6) (all-diff/d 6 peers)] []))]
+    [(8)
+     (conde/d
+       ([] [(==/d c 1) (all-diff/d 1 peers)] [])
+       ([] [(==/d c 2) (all-diff/d 2 peers)] [])
+       ([] [(==/d c 3) (all-diff/d 3 peers)] [])
+       ([] [(==/d c 4) (all-diff/d 4 peers)] [])
+       ([] [(==/d c 5) (all-diff/d 5 peers)] [])
+       ([] [(==/d c 6) (all-diff/d 6 peers)] [])
+       ([] [(==/d c 7) (all-diff/d 7 peers)] [])
+       ([] [(==/d c 8) (all-diff/d 8 peers)] []))]
     [else (error 'cello/d "unsupported N" N)]))
 
 ;; The whole-board /d network: cello/d for every cell, conjoined.
@@ -275,3 +312,4 @@
 (bench "4x4 propagation-solvable" 4 givens-4 solution-4 #t)
 (bench "5x5 requires-guessing" 5 givens-5 solution-5 #t)
 (bench "6x6 propagation-solvable" 6 givens-6-prop solution-6 #f)
+(bench "8x8 propagation-solvable" 8 givens-8-prop solution-8 #f)
