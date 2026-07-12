@@ -4,18 +4,6 @@
 ;; below the fair-search baseline. See
 ;; claude/2026-07-12-204500-examples-earn-after-cleanup.md.
 ;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/rember-full-id-tv4ex.scm
-;; rember-full-id-tv4.scm --- size-closed ID with FOUR termination/type/
-;; canonicity views conjoined in the follower: rung 1 (base-case-patho/d),
-;; rung 2 (decreasing-recursiono/d), rung 3 (type-ofo/d), and rung 4a
-;; (non-vacuous-testso/d).  No evalo/d in the follower.  Extends
-;; experiments/rember-full-id-tv3.scm: rung 4a additionally refutes
-;; `(if (= X X) then else)` candidates with syntactically identical `=`
-;; arguments -- a canonicity restriction, not a semantic one (see
-;; claude/2026-07-12-201800-duplicate-task-and-postviews-spotcheck.md).
-;;
-;;   ./run.sh --check-follower-every 1 --timeout 600 \
-;;     experiments/rember-full-id-tv4.scm
-
 (load "experiments/id-harness.scm")
 (load "experiments/termination-view4.scm") ; loads tv3 (=> tv2 => tv1) too
 
