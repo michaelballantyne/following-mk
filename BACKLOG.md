@@ -54,9 +54,13 @@ optimization. Mere-inefficiency overhead stays out of scope.
   Architectural corollary: factoring the typed interpreter into
   untyped-evaluator view + type view carries the same information
   with attributable contributions (identity #2 applied to the
-  interpreter itself); (b) rung 4b occurs/relevance view (design in the session-close
-  note: occurso/d path-OR, num-holes die free); (c) 4a extension for
-  branch-value vacuity `(if (= x e) x e)` (~11% of residue).
+  interpreter itself); (b) rung 4b occurs/relevance: DONE, recorded NEGATIVE — correct but
+  -1.6% main at +22% follower cost; the family is already dead against
+  the installed stack (`...-203500-rung4b-occurs-negative.md`; kept
+  for the untyped-interpreter scenario); (c) 4c branch-value vacuity
+  `(if (= x e) x e)` — in flight; survives examples BY CONSTRUCTION
+  (behaviorally-correct-but-non-minimal), so unlike 4b its ~11%
+  post-4a estimate is not overlapped by EX.
 
 
 - [ ] **Rung 4: canonicity + relevance views.** Post-3-views stream
