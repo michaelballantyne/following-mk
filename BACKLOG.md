@@ -28,8 +28,30 @@ perturbation-immune (mk fair search is easily perturbed — measured:
 sound constraint-only commits doubled its work). Methodology rules
 stand: every perturbed search order also runs without pruning as its
 own baseline; fair work metric = unify(main)/conde(main).
+Regime call (Michael, 2026-07-12 evening): stay in
+ignore-overhead-and-exhaust-search-space-reductions mode for a good
+while yet — the mainline loop is: sample the surviving stream, find a
+doomed family, build the cheap refuter/view, measure the reduction,
+repeat. Pure-Andorra firing (ce1) is the default in the enumerative
+regime. First-order rep demoted accordingly (overhead motivation out
+of scope; revisit when schedulability/debuggability blocks a
+reduction experiment).
 
 ## Now
+
+- [ ] **Rung 4: canonicity + relevance views.** Post-3-views stream
+  spot check (rember levels 35-43): ~33% is vacuous-condition
+  boilerplate `(if (= X X) ...)` (dead else; equivalent smaller
+  candidate already enumerated — cutting is minimal-answer-preserving)
+  and ~20-25% is e-unreachable recursive branches (plus numeral
+  literals absento-barred from ever equalling any example's e).
+  (a) non-vacuous-testso/d: compare the two `=` positions as program
+  text via two-clause conde/d (==/d -> vacuous -> fail; =/=/d -> ok) —
+  stalls on holes, in progress; (b) relevance view (params must be
+  dataflow-reachable) — needs a design pass on soundness framing
+  (canonicity restriction, Myth-style relevance). Also: add an example
+  pair with same l, different e — the current suite cannot refute
+  e-independence at all.
 
 - [ ] **Explicit search strategies** (Michael's direction: interested
   in other searches even if mk's implicit heuristics must be recovered
@@ -44,12 +66,11 @@ own baseline; fair work metric = unify(main)/conde(main).
   identity constrains the scheduler; protect the relational substrate
   the views compose in, not the interleaving.
 
-- [ ] **First-order representation of the /d search.** Promoted from
-  Later: it is now the substrate for three needs at once — custom
-  search strategies (above), the follower memory problem (frontier ×
-  F-cell closure chains; the view shrank it 4× but bigger tasks will
-  re-hit it), and eventually mkcdcl-style provenance. Design note
-  first: what the tree looks like, what survives across triggers.
+- [ ] **First-order representation of the /d search** — design note
+  written (`claude/2026-07-12-200500-first-order-rep-design.md`);
+  DEMOTED per the evening regime call (its lead motivation is
+  overhead). Implement only when the explicit-search work or
+  debuggability blocks a reduction experiment.
 
 ## Next
 
@@ -71,7 +92,11 @@ own baseline; fair work metric = unify(main)/conde(main).
   right ground to defend the relational substrate against the
   Burst/Trio comparison. Watch per-task: which view refutes/forces,
   whether depth-cut stays 0 (a nonzero = a new divergent family the
-  ladder misses), and views-arm vs baseline ratios.
+  ladder misses), and views-arm vs baseline ratios. Standing practice
+  (Michael): sample each task's surviving explored stream and
+  spot-check for obviously-non-viable families — this loop found the
+  divergence domination, the OR-neutralization, and the rung-4
+  families; it is the engine of the ignore-overhead regime.
 
 - [ ] **Map the FD win regime further** (cheap): Sudoku-style
   benchmark, instances needing more guessing, and where the
