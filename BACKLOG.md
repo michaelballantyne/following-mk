@@ -59,6 +59,20 @@ own baseline; fair work metric = unify(main)/conde(main).
   work. Diff the constraint store too. Until then, don't trust
   "trigger productive" as the propagation signal.
 
+- [ ] **Broaden the synthesis benchmark suite** (endorsed by Michael
+  2026-07-12; `duplicate` in progress as the third task). Within the
+  current language, target answer-shape diversity: `duplicate`
+  (double-cons, no if, 1 param), a member/contains-like task (if-heavy,
+  number result... needs boolean encoding — check expressibility),
+  swap-pairs (nested match), tasks with 2 recursive calls in the body.
+  Then the differentiating class: tasks where *bidirectionality is
+  essential* (run backward/partial-output specs, relation synthesis,
+  Barliman-style) where enumerate-and-test has no natural entry — the
+  right ground to defend the relational substrate against the
+  Burst/Trio comparison. Watch per-task: which view refutes/forces,
+  whether depth-cut stays 0 (a nonzero = a new divergent family the
+  ladder misses), and views-arm vs baseline ratios.
+
 - [ ] **Map the FD win regime further** (cheap): Sudoku-style
   benchmark, instances needing more guessing, and where the
   crossover to baseline-wins sits as propagation-solvability decreases.
@@ -99,10 +113,7 @@ own baseline; fair work metric = unify(main)/conde(main).
   `*main-unsound-depth*` never fires on the benchmark suite either
   (depth-cut 0) — both unsound knobs are now candidates for demotion
   to pure diagnostics or removal.
-- Harder benchmarks for the now-cheap sound enumerative regime —
-  grow the suite past rember/append (more examples, bigger targets,
-  maybe two-recursion tasks) and watch which view starts failing to
-  force.
+- (moved to Next: benchmark broadening)
 - Racket port — only if Chez friction hurts again.
 
 ## Resolved
