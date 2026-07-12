@@ -5,160 +5,165 @@ recent [`claude/`](claude/) notebook entries, `TODO.md`, and the research-goal
 framing in [`README.md`](README.md). An item resolves when answered *either
 way*; move it to Resolved with a one-line answer + link to the `claude/` entry.
 
-Research goal (from `TODO.md`): determine whether determinacy-directed
-propagation can produce **orders-of-magnitude** search savings in *some*
-context, ignoring overhead cost. Only if yes do we invest in lowering
-overhead and generalizing to harder interpreters.
+**Project identity** (Michael, 2026-07-12) — the two distinguishing
+factors to maintain, whatever the search strategy becomes:
 
-Methodology (2026-07-12, see
-`claude/2026-07-12-161259-search-order-constraint-relaxed.md`):
-perturbing the search order (size bounds, iterative deepening, etc.) is
-in scope, under one rule — **every perturbed search order also runs
-without pruning as its own baseline**, so the follower's effect is
-isolated from the search-order effect. Steering is secondary to
-performance gains. Fair work metric: `unify (main)` / `conde (main)`
-(see `claude/2026-07-12-162447-fair-work-metric.md`).
+1. *Write once, run all directions*: a plain relational interpreter
+   yields backward example propagation approximately for free — no
+   per-operator inverse semantics, abstract transformers, or
+   hand-written unevaluation.
+2. *Composable information sources*: interpreter, typechecker,
+   termination constraints, etc. as separate relations composed in one
+   constraint store — never one super-complex algorithm.
+
+**Research-goal status** (2026-07-12): the original existence question —
+orders-of-magnitude savings from determinacy-directed propagation in
+*some* context, overhead ignored — is **answered yes, with headroom**:
+168×→11,092× (work) and up to 934× (wall) on FD Latin squares, and
+731× vs the enumerative baseline on append synthesis once the
+termination view made the population refutable. The refined program:
+raise the *forcing density* available to composed views in synthesis,
+and move to explicit search strategies where measurements are
+perturbation-immune (mk fair search is easily perturbed — measured:
+sound constraint-only commits doubled its work). Methodology rules
+stand: every perturbed search order also runs without pruning as its
+own baseline; fair work metric = unify(main)/conde(main).
 
 ## Now
 
-- [~] **Size-bounded search × follower — the central hypothesis test.**
-  Machinery done (`*max-term-size*`, `watch-size`, `experiments/`
-  ID harness + per-arm files). Runs in progress. Early signal is
-  *against* the hypothesis: under size-closed search the follower's
-  savings shrink (rember-2: 1.9× vs 5–6× under fair interleaving;
-  append bound-11 with deep suspend depth: 1.5×), plausibly because
-  the size bound itself already kills what the follower was killing.
-  Remaining: complete the moderate-config follower arms
-  (check-every=20), get append's total-work-to-answer comparison,
-  write the verdict entry.
+- [ ] **Rung 2 of the termination ladder: structurally-decreasing
+  recursion.** The single highest-leverage addition identified by
+  counters: rember ID levels 39/43 dominate total cost (52M of 57.6M
+  unify) and still show depth-cut 918/3160 — candidates with base
+  cases that diverge at runtime (recursive calls on non-decreasing
+  args), unrefutable by examples, syntactically refutable by requiring
+  self-call args to descend from the match scrutinee's cons-parts.
+  Extend `base-case-patho/d` (needs scrutinee/pattern-var provenance
+  through the term walk). Prediction: collapses the dominant levels
+  the way rung 1 collapsed the divergent spines.
 
-- [ ] **Why does follower state retain gigabytes?** Both check-every=1
-  arms and both suspend-depth=200 arms OOM'd (8–10.6GB) on full-task
-  ID levels, while ce=20/sd=20 configs run in tens of MB. Hypothesis:
-  every live state in the (breadth-heavy) size-bounded frontier
-  carries an F cell holding deep resume-closure chains; memory scales
-  as live-states × suspend-depth. Confirm by instrumentation or
-  analysis; this both blocks oracle-style experiments and is more
-  evidence for the first-order representation. Interim oracle route:
-  moderate suspend-depth steps (40, 60, 100) to find the memory-
-  feasible ceiling.
+- [ ] **Explicit search strategies** (Michael's direction: interested
+  in other searches even if mk's implicit heuristics must be recovered
+  manually). The ID harness is the crude first instance; design the
+  next: a size/cost-frontier priority queue over a first-order
+  representation of the search, with the views as the pruning/forcing
+  layer. Today's map of what mk's interleaving was implicitly doing —
+  geometric demotion of deep spines (→ replaced soundly by the
+  termination view), ordering luck (→ replaced by the size guarantee),
+  completeness via fairness (→ levels complete by construction) — is
+  the checklist of heuristics to recover explicitly. Neither project
+  identity constrains the scheduler; protect the relational substrate
+  the views compose in, not the interleaving.
 
-- [ ] **Benchmark portfolio.** Current tasks (rember/append whole-body
-  holes) are n=2 correlated instances of one schema, with
-  leader/follower information symmetry and a grammar pre-sanitized of
-  irrefutable junk — all of which cap what the follower can show
-  (discussion with Michael 2026-07-12). Add:
-  (a) an **existence-proof benchmark** where unit propagation is known
-  to dominate — a finite-domain puzzle (zebra-style) in /d encoding;
-  separates "mechanism can't win big" from "these benchmarks can't
-  show it";
-  (b) an **asymmetry-controlled family** — same task, varying which
-  examples the follower holds vs the leader (systematizing the ex2 /
-  rember-2 regime that produced the only clear wins). Note (Michael,
-  2026-07-12): the product vision is *symmetric by construction* —
-  leader and follower generated from one source, the user writes plain
-  miniKanren and gets unit propagation under the hood. Asymmetric
-  setups are diagnostic instruments for locating where the value comes
-  from, not a direction.
+- [ ] **First-order representation of the /d search.** Promoted from
+  Later: it is now the substrate for three needs at once — custom
+  search strategies (above), the follower memory problem (frontier ×
+  F-cell closure chains; the view shrank it 4× but bigger tasks will
+  re-hit it), and eventually mkcdcl-style provenance. Design note
+  first: what the tree looks like, what survives across triggers.
 
 ## Next
 
-- [ ] **Pruning-ceiling oracle, memory-feasible version.** What fraction
-  of main-search branches *can* the follower refute when depth-unstarved?
-  Blocked on the memory question above; approach via moderate
-  suspend-depth steps rather than check-every=1 + huge depth (both
-  OOM). If the ceiling is low even unthrottled, no search reordering
-  will make pruning big → pivot to propagation/steering and asymmetric
-  setups as the value story.
+- [ ] **Typechecker as a composed view.** The long-standing TODO item,
+  now concretely motivated as the third view (identity #2) and by the
+  literature contrast (Myth/Synquid get their power from types). The
+  restricted language already has annotations. Which of
+  evaluator/typechecker leads, per the old question — or do they
+  simply compose symmetrically like evalo/d + base-case-patho/d did?
 
-- [ ] **Remove `not-in-envo/d` via tagged applications.** Was a Later
-  item; promoted by the depth-tally finding
-  (`claude/2026-07-12-171500-suspend-depth-source-env-plumbing.md`):
-  env plumbing is 95.7% of suspend cutoffs and `not-in-envo/d` alone
-  is 37% of cutoffs + 134k entries. Removing it both cheapens guards
-  massively and frees depth budget for actual refutation. The single
-  highest-leverage implementation change identified so far.
+- [ ] **Fix the productivity tally.** Constraint-only commits
+  (symbolo/=/= etc.) are invisible to the walk*-based check — B2-ce1
+  scored 221k/221k triggers "unproductive" while doubling main-search
+  work. Diff the constraint store too. Until then, don't trust
+  "trigger productive" as the propagation signal.
 
-- [ ] **Weighted resumption (KL framing, rung 2).** If size-bounded ID
-  had shown pruning converting to real savings, replace round-robin
-  interleaving with a priority queue keyed by accumulated cost (−log₂
-  of a size prior) — "renormalize on refutation". Early ID results make
-  this less likely to pay off for *pruning*; it may still matter as a
-  search-order story independent of the follower. The mass-accounting
-  instrument (does pruning reduce remaining probability mass faster
-  than scheduler slots?) is the cheap first step.
-  See `claude/2026-07-12-163000-guanxi-recon-kl-framing.md`.
+- [ ] **Why is check-every=1 catastrophic?** 0.22s → >200s (append
+  fair) is ~1000×, worse than linear per-trigger cost would suggest.
+  Profile one: is it re-walking the whole term per trigger,
+  reconstructing conj/d structure, constraint-store churn, or
+  something superlinear in trigger count? Matters because pure-Andorra
+  (fire always) is the FD regime's best config — the synthesis/FD
+  split here is unexplained.
 
-- [ ] **Turn ex2/ex3 into reproducible experiments** under
-  `experiments/`, with expected qualitative outcomes in comments.
-  (TODO item 1; partially superseded by the ID experiment files, which
-  now cover the same tasks in bounded form.)
+- [ ] **Map the FD win regime further** (cheap): Sudoku-style
+  benchmark, instances needing more guessing, and where the
+  crossover to baseline-wins sits as propagation-solvability decreases.
 
-- [ ] **Guard-robustness tests.** The soundness argument's load-bearing
-  invariant is that guard evaluation reports `'nondet` on any real
-  ambiguity. Test the sharp cases: guards that diverge (depth limit as
-  sole survivor), guards with multiple answers, guards that extend the
-  store then fail on a later conjunct.
+- [ ] **Guard-robustness tests** (unchanged): diverging guards,
+  multi-answer guards, store-extending guards that fail later — the
+  'nondet-on-real-ambiguity invariant is load-bearing for soundness.
 
-- [ ] **Document the /d sharp corners, fix or fence them.** Recursion
-  not passing through `conde/d` diverges in follower evaluation even
-  under `fresh/d`; end-of-run trigger does not force a suspended
-  follower (deliberately — divergence risk). Write the "follower
-  guarantees" note covering the intended
+- [ ] **Document the /d sharp corners + follower guarantees note**
+  (unchanged): recursion not through conde/d diverges under fresh/d;
+  end-of-run trigger doesn't force suspended followers; the intended
   `(run n (q) (follower q g/d) g)` pattern.
 
 ## Later / ideas
 
-- Characterize the steering effect (rember-2 finds `(rember e d)` where
-  baseline finds a nested-match trick): smallest hole, robustness
-  across `check-every`, does it appear on full tasks with knobs.
-  Steering is secondary, but if the pruning story ends negative, this
-  plus the asymmetry family becomes the mechanism's main demonstrated
-  value.
-- First-order representation of the /d search — debuggability,
-  avoids rebuilding closures per trigger, and now also the leading fix
-  candidate for the gigabyte-retention problem.
-- Related-work positioning note: dKanren, Lozov's work, mkcdcl,
-  backjumping-miniKanren, underconstraints, Andorra, guanxi.
-- **mkcdcl revival (conditional).** Michael's prior mk+SAT/CDCL
-  prototype (git@github.com:michaelballantyne/mkcdcl.git). Known
-  limitations from that effort: same divergent-branch problem we
-  measured today (needs the termination view first); prune-only — no
-  unit propagation, and propagation is where today's big wins came
-  from; disequality provenance blew up in complexity (unification-only
-  likely). Revisit IF post-termination-view results suggest refutation
-  needs learned *reasons* (CDCL) rather than just checks; the
-  first-order /d representation would be the natural substrate for
-  provenance, and Michael's old idea of confining provenance tracking
-  to the infrequently-fired follower search still looks right.
-- Name and document the inf/d return type (not a stream — never splits);
-  rename `case-inf/d` and `stream` variable names to match.
-- Separate interpreter and typechecker for the same language as
-  leader/follower — which should lead? (A natural member of the
-  asymmetry family above.)
-- Remove `*unsound-fail-depth*`? Unused; keep as diagnostic until the
-  tracing/first-order tools replace it.
-- Verify and document that `set-var-val!` is genuinely disabled on the
-  /d path (fixpoint-note change detection depends on it).
-- Racket port — only if Chez friction keeps hurting.
+- **Verify + polish the related-work survey draft**
+  (`claude/2026-07-12-190000-related-synthesis-systems.md`) — machine-
+  written with unverified citations; check before citing externally.
+  Reading shortlist inside: SMyth, Blaze, Burst, SyRup, Neural-Guided
+  CLP.
+- **mkcdcl revival (conditional)** — if refutation turns out to need
+  learned *reasons* (CDCL lemmas) beyond checks. Known limitations of
+  the prototype (Michael): same divergence gap (now addressed by the
+  view), prune-only (no propagation — the expensive half to miss),
+  disequality provenance blow-up. First-order rep is the natural
+  provenance substrate; confining provenance to the follower still
+  looks right. Repo: git@github.com:michaelballantyne/mkcdcl.git.
+- **Env-plumbing removal** (tagged applications, cheaper lookup) —
+  95.7% of suspend cutoffs, a third of guard work; matters whenever
+  evalo/d is a heavy view again.
+- **Steering characterization** (rember-2 lineage) — answer-quality
+  story, partially subsumed by the size guarantee under ID.
+- **Asymmetric leader/follower setups** — diagnostic instruments only
+  (the product is symmetric by construction).
+- Name/document the inf/d return type; rename `case-inf/d`/`stream`.
+- Verify set-var-val! is genuinely disabled on the /d path.
+- Remove `*unsound-fail-depth*`? Still unused; `*main-unsound-depth*`
+  earned its keep today (level-finiteness), this one didn't.
+- Racket port — only if Chez friction hurts again.
 
 ## Resolved
 
-- ~~A fair cross-arm work metric~~ — done 2026-07-12: unifier-level
-  counters split main/follower + conde-entry counters; follower saves
-  ~5–6× main work under fair interleaving.
-  `claude/2026-07-12-162447-fair-work-metric.md`.
-- ~~Where does the follower's deep unfolding come from?~~ — resolved
-  2026-07-12: 95.7% of suspend cutoffs are env plumbing
-  (`not-in-envo/d` + `lookupo/d` linear scans under one shared depth
-  budget), not degenerate program expansion.
-  `claude/2026-07-12-171500-suspend-depth-source-env-plumbing.md`.
-- ~~Guanxi / KL-divergence recon~~ — done 2026-07-12: propagator
-  fixpoint over plain DFS; KL remark reconstructed as
-  "explore proportional to posterior mass, renormalize on refutation."
-  `claude/2026-07-12-163000-guanxi-recon-kl-framing.md`.
-- ~~check-every=1 follower arms on full ID tasks~~ — infeasible, OOM
-  at ~8GB with zero levels completed (2026-07-12); throttling is
-  mandatory. Folded into the memory-retention item above.
-- ~~Enhance test-check to summarize at end of test-all.scm~~ — already
-  done; `test-all.scm` prints a final tally.
+All 2026-07-12 unless noted; details in the linked entries.
+
+- ~~Size-bounded ID rescues pruning~~ — falsified as posed (follower
+  savings *shrank* to 1.5×; memory-infeasible; low bounds
+  divergence-dominated), then **resurrected by composition**: ID +
+  termination view solves both tasks, 731× vs enumerative baseline on
+  append, rember to answer in 86s where baseline died. Verdict:
+  `...-174500-size-bounded-id-verdict.md`; capstone:
+  `...-181613-id-plus-view-capstone.md`.
+- ~~Termination view (rung 1)~~ — built (`base-case-patho/d`), correct,
+  regime-dependent: ≈neutral under fair search, transformative under
+  ID, 4× follower-memory reduction. `...-184500-termination-view-results.md`.
+- ~~What does the search actually explore?~~ — ~98% of size-bounded
+  search work is unconditionally divergent candidates at every level;
+  fair search never materializes them as complete bodies.
+  `...-183000-population-composition.md`.
+- ~~Existence proof (FD)~~ — Latin squares: 168× (6×6) → 11,092× work
+  / 934× wall (8×8); whole board solved in one install-time firing;
+  gap grows combinatorially. `...-173259-latin-square-existence-proof.md`,
+  `...-181500-latin-8x8-scaling.md`.
+- ~~Fair work metric~~ — unify(main)/conde(main) at the unifier level;
+  follower saves ~5–6× under fair interleaving on the old benchmarks.
+  `...-162447-fair-work-metric.md`.
+- ~~Where does the deep unfolding come from?~~ — 95.7% env plumbing
+  (`not-in-envo/d`/`lookupo/d`), not degenerate programs.
+  `...-171500-suspend-depth-source-env-plumbing.md`.
+- ~~Guanxi/KL recon~~ — propagator fixpoint over DFS; "explore ∝
+  posterior mass, renormalize on refutation" reconstruction.
+  `...-163000-guanxi-recon-kl-framing.md`. Weighted resumption folded
+  into the explicit-search item.
+- ~~Do the whole-body baselines terminate?~~ — YES under fair search
+  (rember 3.5–6.8s, append 0.22s, canonical answers); April-era
+  non-termination belief was stale; ce1 follower arms are what time
+  out (>145–1000× wall). `...-184500-termination-view-results.md`.
+- ~~Seeded-skeleton experiment~~ — seeded baseline solves in 6.2s
+  (true answer), confirming divergence-domination; superseded by the
+  view. (Files: `experiments/{rember,append}-seeded.scm`.)
+- ~~check-every=1 on full tasks~~ — infeasible in every regime
+  (OOM under ID; ~1000× wall under fair search). Root cause → Next.
+- ~~Enhance test-check summary~~ — pre-existing (April).
