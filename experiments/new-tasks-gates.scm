@@ -132,39 +132,39 @@
 ;; ===========================================================================
 
 ;; --- R1 base-case-patho/d (all accept) ---
-(test "R1 member"     (run 1 (q) (follower q (base-case-patho/d 'member q)     (== q member-canon)))     '(_.0))
-(test "R1 last"       (run 1 (q) (follower q (base-case-patho/d 'last q)       (== q last-canon)))       '(_.0))
-(test "R1 swap"       (run 1 (q) (follower q (base-case-patho/d 'swap q)       (== q swap-canon)))       '(_.0))
-(test "R1 evens"      (run 1 (q) (follower q (base-case-patho/d 'evens q)      (== q evens-canon)))      '(_.0))
-(test "R1 rev"        (run 1 (q) (follower q (base-case-patho/d 'rev q)        (== q rev-canon)))        '(_.0))
-(test "R1 interleave" (run 1 (q) (follower q (base-case-patho/d 'interleave q) (== q interleave-canon))) '(_.0))
+(test "R1 member"     (run 1 (q) (follower q (base-case-patho/d 'member member-canon)))         '(_.0))
+(test "R1 last"       (run 1 (q) (follower q (base-case-patho/d 'last last-canon)))             '(_.0))
+(test "R1 swap"       (run 1 (q) (follower q (base-case-patho/d 'swap swap-canon)))             '(_.0))
+(test "R1 evens"      (run 1 (q) (follower q (base-case-patho/d 'evens evens-canon)))           '(_.0))
+(test "R1 rev"        (run 1 (q) (follower q (base-case-patho/d 'rev rev-canon)))               '(_.0))
+(test "R1 interleave" (run 1 (q) (follower q (base-case-patho/d 'interleave interleave-canon))) '(_.0))
 
 ;; --- R2 decreasing-recursiono/d (all accept EXCEPT interleave, which refutes) ---
-(test "R2 member"     (run 1 (q) (follower q (decreasing-recursiono/d 'member '(e l) q)   (== q member-canon)))     '(_.0))
-(test "R2 last"       (run 1 (q) (follower q (decreasing-recursiono/d 'last '(l) q)        (== q last-canon)))       '(_.0))
-(test "R2 swap"       (run 1 (q) (follower q (decreasing-recursiono/d 'swap '(l) q)        (== q swap-canon)))       '(_.0))
-(test "R2 evens"      (run 1 (q) (follower q (decreasing-recursiono/d 'evens '(l) q)       (== q evens-canon)))      '(_.0))
-(test "R2 rev"        (run 1 (q) (follower q (decreasing-recursiono/d 'rev '(l acc) q)     (== q rev-canon)))        '(_.0))
+(test "R2 member"     (run 1 (q) (follower q (decreasing-recursiono/d 'member '(e l) member-canon))) '(_.0))
+(test "R2 last"       (run 1 (q) (follower q (decreasing-recursiono/d 'last '(l) last-canon)))       '(_.0))
+(test "R2 swap"       (run 1 (q) (follower q (decreasing-recursiono/d 'swap '(l) swap-canon)))       '(_.0))
+(test "R2 evens"      (run 1 (q) (follower q (decreasing-recursiono/d 'evens '(l) evens-canon)))     '(_.0))
+(test "R2 rev"        (run 1 (q) (follower q (decreasing-recursiono/d 'rev '(l acc) rev-canon)))     '(_.0))
 ;; FINDING: interleave's argument-swapping recursion has no fixed decreasing
 ;; position -> R2 REFUTES.  This is why interleave drops R2 from its stack.
 (test "R2 interleave REFUTED (argument-swap; documented finding)"
-  (run 1 (q) (follower q (decreasing-recursiono/d 'interleave '(l1 l2) q) (== q interleave-canon))) '())
+  (run 1 (q) (follower q (decreasing-recursiono/d 'interleave '(l1 l2) interleave-canon))) '())
 
 ;; --- TY type-ofo/d (all accept at declared result type) ---
-(test "TY member"     (run 1 (q) (follower q (type-ofo/d member-tyenv q 'number)     (== q member-canon)))     '(_.0))
-(test "TY last"       (run 1 (q) (follower q (type-ofo/d last-tyenv q 'number)       (== q last-canon)))       '(_.0))
-(test "TY swap"       (run 1 (q) (follower q (type-ofo/d swap-tyenv q 'list)         (== q swap-canon)))       '(_.0))
-(test "TY evens"      (run 1 (q) (follower q (type-ofo/d evens-tyenv q 'list)        (== q evens-canon)))      '(_.0))
-(test "TY rev"        (run 1 (q) (follower q (type-ofo/d rev-tyenv q 'list)          (== q rev-canon)))        '(_.0))
-(test "TY interleave" (run 1 (q) (follower q (type-ofo/d interleave-tyenv q 'list)   (== q interleave-canon))) '(_.0))
+(test "TY member"     (run 1 (q) (follower q (type-ofo/d member-tyenv member-canon 'number)))     '(_.0))
+(test "TY last"       (run 1 (q) (follower q (type-ofo/d last-tyenv last-canon 'number)))         '(_.0))
+(test "TY swap"       (run 1 (q) (follower q (type-ofo/d swap-tyenv swap-canon 'list)))           '(_.0))
+(test "TY evens"      (run 1 (q) (follower q (type-ofo/d evens-tyenv evens-canon 'list)))         '(_.0))
+(test "TY rev"        (run 1 (q) (follower q (type-ofo/d rev-tyenv rev-canon 'list)))             '(_.0))
+(test "TY interleave" (run 1 (q) (follower q (type-ofo/d interleave-tyenv interleave-canon 'list))) '(_.0))
 
 ;; --- NV non-vacuous-testso/d (all accept) ---
-(test "NV member"     (run 1 (q) (follower q (non-vacuous-testso/d q) (== q member-canon)))     '(_.0))
-(test "NV last"       (run 1 (q) (follower q (non-vacuous-testso/d q) (== q last-canon)))       '(_.0))
-(test "NV swap"       (run 1 (q) (follower q (non-vacuous-testso/d q) (== q swap-canon)))       '(_.0))
-(test "NV evens"      (run 1 (q) (follower q (non-vacuous-testso/d q) (== q evens-canon)))      '(_.0))
-(test "NV rev"        (run 1 (q) (follower q (non-vacuous-testso/d q) (== q rev-canon)))        '(_.0))
-(test "NV interleave" (run 1 (q) (follower q (non-vacuous-testso/d q) (== q interleave-canon))) '(_.0))
+(test "NV member"     (run 1 (q) (follower q (non-vacuous-testso/d member-canon)))     '(_.0))
+(test "NV last"       (run 1 (q) (follower q (non-vacuous-testso/d last-canon)))       '(_.0))
+(test "NV swap"       (run 1 (q) (follower q (non-vacuous-testso/d swap-canon)))       '(_.0))
+(test "NV evens"      (run 1 (q) (follower q (non-vacuous-testso/d evens-canon)))      '(_.0))
+(test "NV rev"        (run 1 (q) (follower q (non-vacuous-testso/d rev-canon)))        '(_.0))
+(test "NV interleave" (run 1 (q) (follower q (non-vacuous-testso/d interleave-canon))) '(_.0))
 
 ;; ===========================================================================
 ;; (3) WIRING gates: tiny bounds (11 15), well below every answer, so each run
