@@ -91,6 +91,12 @@
 (define *main-unsound-depth-cutoff-counter* 0)
 (define *==-counter* 0)
 (define *==/d-counter* 0)
+;; Main-search conde expansions: bumped once per invocation of the closure
+;; returned by main-conde-hook (once per main-search conde entry).
+(define *main-conde-counter* 0)
+;; Follower conde/d entries: bumped once per evaluation attempt in
+;; conde/d-runtime (once per state that reaches the clause loop).
+(define *conde/d-counter* 0)
 (define *fail-counter* 0)
 (define *singleton-succeed-counter* 0)
 (define *non-singleton-succeed-counter* 0)
@@ -114,6 +120,13 @@
   (set! *main-unsound-depth-cutoff-counter* 0)
   (set! *==-counter* 0)
   (set! *==/d-counter* 0)
+  (set! *main-conde-counter* 0)
+  (set! *conde/d-counter* 0)
+  ;; These three live in mk.scm; following.scm is loaded into the same
+  ;; top-level environment (see load.scm), so we reset them directly.
+  (set! *main-unify-counter* 0)
+  (set! *follower-unify-counter* 0)
+  (set! *in-follower-eval?* #f)
   (set! *fail-counter* 0)
   (set! *singleton-succeed-counter* 0)
   (set! *non-singleton-succeed-counter* 0)
@@ -122,7 +135,19 @@
   (set! *user-counter* 0))
 
 (define counter-descriptors
-  (list (cons "== (main)"
+  (list (cons "unify (main)"
+              (lambda ()
+                *main-unify-counter*))
+        (cons "unify (follower)"
+              (lambda ()
+                *follower-unify-counter*))
+        (cons "conde (main)"
+              (lambda ()
+                *main-conde-counter*))
+        (cons "conde/d entries"
+              (lambda ()
+                *conde/d-counter*))
+        (cons "== (main)"
               (lambda ()
                 *==-counter*))
         (cons "== (/d)"
@@ -366,6 +391,7 @@
      (lambda (st)
        (define (nondeterministic)
          (check-type (cons st (g-thunk)) inf/d?))
+       (increment-counter! *conde/d-counter*)
        (check-type st state?)
        (let ([st (state-with-scope st (new-scope))]) ;; for set-var-val at choice point entry
          (let loop ([clauses clauses]
@@ -523,6 +549,7 @@
 
 (define (main-conde-hook)
   (lambda (st)
+    (increment-counter! *main-conde-counter*)
     (let ([d^ (+ 1 (state-D st))])
       (if (> d^ (*main-unsound-depth*))
           (begin
@@ -553,27 +580,36 @@
   (let ([g (car F)]
         [t (cdr F)]
         [before-walked (walk* (cdr F) (state-S st))])
-    (let ([$ ((g 0) (state-with-scope st (new-scope)))])
-      (case-inf/d $
-        [()
-         (begin
-           (increment-counter! *fail-counter*)
-           #f)]
-        [(c^)
-         (begin
-           (increment-counter! *singleton-succeed-counter*)
-           (tally-productivity! before-walked t c^)
-           (state-with-F c^ #f))]
-        [(c^ f^)
-         (begin
-           (increment-counter! *non-singleton-succeed-counter*)
-           (tally-productivity! before-walked t c^)
-           (state-with-F c^ (cons f^ t)))]
-        [(ch fh)
-         (begin
-           (increment-counter! *non-singleton-succeed-counter*)
-           (tally-productivity! before-walked t ch)
-           (state-with-F ch (cons fh t)))]))))
+    ;; Mark unifications performed during the follower goal invocation (and
+    ;; the case-inf/d dispatch over its result) as follower work, so mk.scm's
+    ;; unify counter attributes them to *follower-unify-counter*. The follower
+    ;; search commits deterministically and does not escape non-locally, so a
+    ;; plain set!/restore is sufficient (no dynamic-wind needed).
+    (set! *in-follower-eval?* #t)
+    (let ([result
+           (let ([$ ((g 0) (state-with-scope st (new-scope)))])
+             (case-inf/d $
+               [()
+                (begin
+                  (increment-counter! *fail-counter*)
+                  #f)]
+               [(c^)
+                (begin
+                  (increment-counter! *singleton-succeed-counter*)
+                  (tally-productivity! before-walked t c^)
+                  (state-with-F c^ #f))]
+               [(c^ f^)
+                (begin
+                  (increment-counter! *non-singleton-succeed-counter*)
+                  (tally-productivity! before-walked t c^)
+                  (state-with-F c^ (cons f^ t)))]
+               [(ch fh)
+                (begin
+                  (increment-counter! *non-singleton-succeed-counter*)
+                  (tally-productivity! before-walked t ch)
+                  (state-with-F ch (cons fh t)))]))])
+      (set! *in-follower-eval?* #f)
+      result)))
 
 (define (tally-productivity! before-walked t c^)
   (let ([after-walked (walk* t (state-S c^))])

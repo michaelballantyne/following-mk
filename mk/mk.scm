@@ -208,6 +208,16 @@
 
 ; Unification
 
+; --- following-mk patch: cross-arm unify work counters. Every unify entry
+; (including recursive calls, so the count scales with structure traversed)
+; bumps one of these depending on whether we are inside a follower evaluation.
+; *in-follower-eval?* is a plain boolean global (single-threaded; kept cheap,
+; not a parameter). following.scm sets it around follower goal invocation and
+; resets these globals in reset-counters!.
+(define *main-unify-counter* 0)
+(define *follower-unify-counter* 0)
+(define *in-follower-eval?* #f)
+
 ; UnificationResult: (or/c (values Substitution (Listof Association))
 ;                          (values #f #f)
 ; An extended substitution and a list of associations added during the unification,
@@ -215,6 +225,9 @@
 
 ; Term, Term, Substitution -> UnificationResult
 (define (unify u v s)
+  (if *in-follower-eval?*
+    (set! *follower-unify-counter* (+ 1 *follower-unify-counter*))
+    (set! *main-unify-counter* (+ 1 *main-unify-counter*)))
   (let ((u (walk u s))
         (v (walk v s)))
     (cond
