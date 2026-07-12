@@ -59,14 +59,6 @@ own baseline; fair work metric = unify(main)/conde(main).
   work. Diff the constraint store too. Until then, don't trust
   "trigger productive" as the propagation signal.
 
-- [ ] **Why is check-every=1 catastrophic?** 0.22s → >200s (append
-  fair) is ~1000×, worse than linear per-trigger cost would suggest.
-  Profile one: is it re-walking the whole term per trigger,
-  reconstructing conj/d structure, constraint-store churn, or
-  something superlinear in trigger count? Matters because pure-Andorra
-  (fire always) is the FD regime's best config — the synthesis/FD
-  split here is unexplained.
-
 - [ ] **Map the FD win regime further** (cheap): Sudoku-style
   benchmark, instances needing more guessing, and where the
   crossover to baseline-wins sits as propagation-solvability decreases.
@@ -116,6 +108,15 @@ own baseline; fair work metric = unify(main)/conde(main).
 ## Resolved
 
 All 2026-07-12 unless noted; details in the linked entries.
+
+- ~~Why is check-every=1 catastrophic?~~ — it isn't, except under fair
+  search: chain-growth falsified (worklists bounded at 3–4, flat
+  per-trigger cost); the blowup decomposes into ~20–30× linear firing
+  cost × fair-search trajectory perturbation. Under ID, ce1 *solves
+  faster and with less main work* than ce20. Pure-Andorra is right in
+  the enumerative regime; the per-fire rebuild constant is now the
+  whole overhead story (→ first-order rep).
+  `...-195900-ce1-catastrophe-resolved.md`.
 
 - ~~Typechecker as the third view (rung 3)~~ — built (`type-ofo/d`),
   gates pass; −7.5% unify on top of rungs 1+2, and the project's
