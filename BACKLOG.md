@@ -57,16 +57,21 @@ views, coverage) are parked in Next behind broadening.
   instrumentation item: per-view refute/force attribution counters
   (unify(f) is currently the only proxy).
 
-- [~] **Benchmark broadening, wave 1** (in flight this session;
-  moved up from Next per directive): member? (boolean-as-number),
-  last (dead nil-branch — coverage-view fodder), swap-pairs (nested
-  match, biggest answer), evens, rev-acc (accumulator param),
-  interleave (argument-swapping recursion — expected to expose R2's
-  fixed-position restriction). Full-stack tv4ex-pattern arms + gates
-  first; ID measurements + baseline arms + stream sampling after.
-  Then the differentiating class: bidirectionality-essential tasks
-  (backward/partial-output specs) — the ground where
-  enumerate-and-test has no natural entry.
+- [ ] **Generalize the termination view beyond fixed-position
+  decrease** (wave 1's one new view-shaped need,
+  `...-214500-benchmark-wave1-results.md` finding 4): interleave's
+  argument-swapping recursion is soundly refuted by R2, and the
+  R2-less stack is *infeasible* — the view is load-bearing for
+  feasibility. Candidate measures, as /d views: total-size/multiset
+  decrease across all arguments; lexicographic orders over argument
+  permutations. Gate on interleave + all existing canonicals.
+
+- [ ] **Benchmark wave 2**: (a) sample the surviving streams of the
+  wave-1 tasks (standing practice; queued behind the untyped+TY
+  port so we sample the architecture we keep); (b) the
+  differentiating class — bidirectionality-essential tasks
+  (backward/partial-output specs, relation synthesis, Barliman-style)
+  where enumerate-and-test has no natural entry.
 
 
 - [ ] **Rung 4: canonicity + relevance views.** Post-3-views stream
@@ -201,6 +206,16 @@ views, coverage) are parked in Next behind broadening.
 ## Resolved
 
 All 2026-07-12 unless noted; details in the linked entries.
+
+- ~~Benchmark broadening wave 1 (build + first measurements)~~ — six
+  tasks added (member?, last, swap-pairs, evens, rev-acc, interleave);
+  the unchanged five-view stack solves 5/6 in 4–38s, all six
+  enumerative baselines timeout (matched-level ratios 175×–2,380×);
+  machine beat the human canonical on swap (63 vs 74) and evens (55
+  vs 69); evens spec bug caught by minimality; last reified its
+  spec-dead branch as a hole; interleave exposed R2 as load-bearing
+  for feasibility (→ new Now item).
+  `...-214500-benchmark-wave1-results.md`.
 
 - ~~Is TY worth keeping / untyped-interpreter factoring~~ — YES, and
   the factoring is free: untyped generator + type-ofo/d matches

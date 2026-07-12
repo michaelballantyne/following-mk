@@ -13,7 +13,7 @@
 (define interleave-tyenv
   '((interleave . ((list list) -> list)) (l1 . list) (l2 . list)))
 
-(run-id "interleave-full/tv4ex(noR2)" '(11 15 19 23 27 31 35 39) 1000
+(run-id "interleave-full/no-follower" '(11 15 19 23 27 31 35 39) 1000
   (lambda (bound)
     (run 1 (q)
       (watch-size q)
