@@ -47,11 +47,10 @@ optimization. Mere-inefficiency overhead stays out of scope.
   candidate already enumerated — cutting is minimal-answer-preserving)
   and ~20-25% is e-unreachable recursive branches (plus numeral
   literals absento-barred from ever equalling any example's e).
-  (a) non-vacuous-testso/d: compare the two `=` positions as program
-  text via two-clause conde/d (==/d -> vacuous -> fail; =/=/d -> ok) —
-  stalls on holes, in progress; (b) relevance view (params must be
-  dataflow-reachable) — needs a design pass on soundness framing
-  (canonicity restriction, Myth-style relevance). Also: add an example
+  (a) non-vacuous-testso/d: DONE (1.61x further on rember;
+  `...-203000-rung4a-vacuous-conditions.md`); (b) relevance view
+  (params must be dataflow-reachable) — needs a design pass on
+  soundness framing (canonicity restriction, Myth-style relevance). Also: add an example
   pair with same l, different e — the current suite cannot refute
   e-independence at all.
 
