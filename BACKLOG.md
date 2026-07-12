@@ -61,6 +61,15 @@ performance gains.
 
 ## Next
 
+- [ ] **Weighted resumption (KL framing, rung 2).** If size-bounded ID
+  shows pruning converting to real savings, replace round-robin
+  interleaving with a priority queue keyed by accumulated cost (−log₂
+  of a size prior), so a refuted branch's budget flows to its neighbors
+  under the measure ("renormalize on refutation"). If ID results are
+  ambiguous, first do the mass-accounting instrument: measure whether
+  pruning reduces remaining probability mass faster than scheduler
+  slots. See `claude/2026-07-12-163000-guanxi-recon-kl-framing.md`.
+
 - [ ] **Pruning-ceiling oracle experiment.** Run with `check-every=1` and a
   very large suspend depth, ignoring all cost: what fraction of
   main-search branches *can* the follower refute on rember-full /
