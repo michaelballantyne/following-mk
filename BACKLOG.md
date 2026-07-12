@@ -50,6 +50,24 @@ work**. All four explored same session; symbolic examples got folded
 into the wave-2 Now item, the other survey ideas (abstract-domain
 views, coverage) wait in Next.
 
+**Session handoff (2026-07-12, session end — cold-start here):**
+Task 1 (R2 generalization) is functionally done: R2P built (incomparable
+to R2 — rev-acc vs interleave), R2T = R2∨R2P is the production view,
+gates green (suite 120, r2p-gates 91), interleave feasible (108k @ 35).
+REMAINING: the R2T cost batch died with the session — re-run
+`./run.sh --check-follower-every 1 --timeout 240
+experiments/{rember,duplicate,rev-acc,interleave}-full-id-views-r2t.scm`,
+compare vs R2 arms (rember 312,236 / duplicate 53,812 / rev-acc 130,115
+/ interleave-r2p 108,475), decide uniform-R2T-default vs per-task
+measure, write the task-1 notebook entry (R2P/R2T story so far lives in
+commit 374ed9b's message and the agents' gate files). Task 2 (wave 2):
+design note `...-223500-wave2-bidirectional-design.md`; prerequisites
+DONE (resumption-aware tally/d — first distribution: member EX 54/436,
+TY 147/85; untyped+TY ports all within ±3% of typed, same answers) —
+next is building the three W2 arms per the design note (symbolic rember
+with same-l/different-e, prefix-partialized swap outputs, rev-involution
+with concrete anchors against the identity degenerate).
+
 ## Now
 
 (ordered per the 2026-07-12 reflection)
