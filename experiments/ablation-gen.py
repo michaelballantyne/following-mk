@@ -39,7 +39,7 @@ TASKS = {
             ("(rember-prog q '(rember 7 (cons 3 (cons 4 (cons 7 (cons 6 '()))))))", "'(3 4 6)"),
             ("(rember-prog q '(rember 5 (cons 3 (cons 4 (cons 6 (cons 7 '()))))))", "'(3 4 6 7)"),
         ],
-        "load": 'experiments/termination-view4.scm',
+        "load": 'views.scm',
     },
     "append": {
         "fname": "append",
@@ -59,7 +59,7 @@ TASKS = {
             ("(append-prog q '(append '() (cons 5 (cons 6 '()))))", "'(5 6)"),
             ("(append-prog q '(append (cons 3 (cons 4 (cons 5 '()))) (cons 6 (cons 7 '()))))", "'(3 4 5 6 7)"),
         ],
-        "load": 'experiments/termination-view4.scm',
+        "load": 'views.scm',
     },
     "duplicate": {
         "fname": "duplicate",
@@ -80,7 +80,7 @@ TASKS = {
             ("(duplicate-prog q '(duplicate (cons 5 '())))", "'(5 5)"),
             ("(duplicate-prog q '(duplicate (cons 3 (cons 4 '()))))", "'(3 3 4 4)"),
         ],
-        "load": 'experiments/termination-view4.scm',
+        "load": 'views.scm',
     },
 }
 

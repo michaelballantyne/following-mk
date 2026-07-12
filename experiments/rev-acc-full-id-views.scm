@@ -1,6 +1,6 @@
-;; rev-acc-full-id-tv4ex.scm --- size-closed ID synthesis of accumulator-reverse,
+;; rev-acc-full-id-views.scm --- size-closed ID synthesis of accumulator-reverse,
 ;; the full follower stack (R1+R2+TY+NV) PLUS evalo/d over the examples,
-;; check-every 1.  Mirrors experiments/rember-full-id-tv4ex.scm.
+;; check-every 1.  Mirrors experiments/rember-full-id-views.scm.
 ;;
 ;; Task: rev : ((list list) -> list).  Reverse `l` onto accumulator `acc`.
 ;;   The examples always call it with acc = '(), so (rev l '()) = reverse(l).
@@ -22,9 +22,9 @@
 ;; has no numeric literals.  A strictly smaller satisfying program is not
 ;; expected -- the answer is already near-minimal for a two-argument recursion.
 ;;
-;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/rev-acc-full-id-tv4ex.scm
+;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/rev-acc-full-id-views.scm
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view4.scm") ; loads tv3 (=> tv2 => tv1) too
+(load "views.scm") ; R1+R2+TY+NV view definitions
 
 (define (rev-prog q body)
   `(letrec ([rev (lambda (l acc) : ((list list) -> list)
@@ -33,7 +33,7 @@
 
 (define rev-tyenv '((rev . ((list list) -> list)) (l . list) (acc . list)))
 
-(run-id "rev-acc-full/tv4ex" '(11 15 19 23 27 31 35 39) 1000
+(run-id "rev-acc-full/views" '(11 15 19 23 27 31 35 39) 1000
   (lambda (bound)
     (run 1 (q)
       (watch-size q)

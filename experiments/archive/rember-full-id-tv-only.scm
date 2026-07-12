@@ -7,7 +7,7 @@
 ;;     experiments/rember-full-id-tv-only.scm
 
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view.scm")
+(load "views.scm")
 
 (define (rember-prog q body)
   `(letrec ([rember (lambda (e l) : ((number list) -> list)

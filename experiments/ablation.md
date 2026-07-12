@@ -1,5 +1,13 @@
 # Limiter ablation: how much search does each follower view cut?
 
+> **Note (post-reorg).** This file predates the experiments/ reorganization.
+> The `tv4ex` arms it references are now `*-full-id-views.scm`, and the four
+> view sources (R1/R2/TY/NV) that were chain-loaded from
+> `experiments/termination-view{,2,3,4}.scm` now live in the repo-root
+> `views.scm`. Later results — the untyped-interpreter factoring and the
+> wave-1 tasks (member/last/swap/evens/rev-acc/interleave) — live in the
+> `claude/` entries of the 2026-07-12 evening, not here.
+
 As of **2026-07-12**, `--check-follower-every 1` (ce1), size-closed ID
 protocol (the `run-id` pattern from `experiments/id-harness.scm` /
 `experiments/rember-full-id-tv4.scm`), `--main-unsound-depth 1000`,

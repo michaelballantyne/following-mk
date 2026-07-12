@@ -1,6 +1,6 @@
-;; evens-full-id-tv4ex.scm --- size-closed ID synthesis of `evens`, the full
+;; evens-full-id-views.scm --- size-closed ID synthesis of `evens`, the full
 ;; follower stack (R1+R2+TY+NV) PLUS evalo/d over the examples, check-every 1.
-;; Mirrors experiments/rember-full-id-tv4ex.scm.
+;; Mirrors experiments/rember-full-id-views.scm.
 ;;
 ;; Task: evens : ((list) -> list).  Every other element starting with the first.
 ;;   (a b c d e) -> (a c e).
@@ -28,9 +28,9 @@
 ;; Absento excludes example constants 5,6,7,8; the canonical body has no numeric
 ;; literals.
 ;;
-;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/evens-full-id-tv4ex.scm
+;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/evens-full-id-views.scm
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view4.scm") ; loads tv3 (=> tv2 => tv1) too
+(load "views.scm") ; R1+R2+TY+NV view definitions
 
 (define (evens-prog q body)
   `(letrec ([evens (lambda (l) : ((list) -> list)
@@ -39,7 +39,7 @@
 
 (define evens-tyenv '((evens . ((list) -> list)) (l . list)))
 
-(run-id "evens-full/tv4ex" '(39 43 47 51 55 59 63 67 71 75) 1000
+(run-id "evens-full/views" '(39 43 47 51 55 59 63 67 71 75) 1000
   (lambda (bound)
     (run 1 (q)
       (watch-size q)

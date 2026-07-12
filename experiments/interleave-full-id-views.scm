@@ -1,6 +1,6 @@
-;; interleave-full-id-tv4ex.scm --- size-closed ID synthesis of `interleave`.
+;; interleave-full-id-views.scm --- size-closed ID synthesis of `interleave`.
 ;; DELIBERATE STRESS TEST of the fixed-position restriction in R2
-;; (decreasing-recursiono/d).  Mirrors experiments/rember-full-id-tv4ex.scm in
+;; (decreasing-recursiono/d).  Mirrors experiments/rember-full-id-views.scm in
 ;; structure, but the follower stack is R1 + TY + NV + evalo/d ONLY -- R2 is
 ;; OMITTED.  See the finding below.
 ;;
@@ -37,9 +37,9 @@
 ;; Absento excludes example constants 5,6,7,8; the canonical body has no numeric
 ;; literals.
 ;;
-;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/interleave-full-id-tv4ex.scm
+;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/interleave-full-id-views.scm
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view4.scm") ; loads tv3 (=> tv2 => tv1) too
+(load "views.scm") ; R1+R2+TY+NV view definitions
 
 (define (interleave-prog q body)
   `(letrec ([interleave (lambda (l1 l2) : ((list list) -> list)
@@ -49,7 +49,7 @@
 (define interleave-tyenv
   '((interleave . ((list list) -> list)) (l1 . list) (l2 . list)))
 
-(run-id "interleave-full/tv4ex(noR2)" '(11 15 19 23 27 31 35 39) 1000
+(run-id "interleave-full/views(noR2)" '(11 15 19 23 27 31 35 39) 1000
   (lambda (bound)
     (run 1 (q)
       (watch-size q)

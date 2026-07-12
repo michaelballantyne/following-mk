@@ -3,7 +3,7 @@
 ;; Dynamically-typed Lisp semantics: the `type` argument that threaded through
 ;; every clause of the typed interpreter is GONE.  All type information that
 ;; used to live in the interpreter now lives ONLY in the `type-ofo/d` follower
-;; view (experiments/termination-view3.scm).  The point of the split is an
+;; view (experiments/views.scm).  The point of the split is an
 ;; information-attribution experiment: with the generator untyped, a static
 ;; type error is refutable by an example ONLY if evaluation actually reaches
 ;; the stuck expression; a statically ill-typed but never-executed subterm is

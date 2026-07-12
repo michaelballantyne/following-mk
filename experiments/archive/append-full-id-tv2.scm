@@ -6,7 +6,7 @@
 ;;     experiments/append-full-id-tv2.scm
 
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view2.scm") ; loads termination-view.scm too
+(load "views.scm") ; loads termination-view.scm too
 
 (define (append-prog q body)
   `(letrec ([append (lambda (l s) : ((list list) -> list)

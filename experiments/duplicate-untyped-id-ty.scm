@@ -1,6 +1,6 @@
 ;; duplicate-untyped-id-ty.scm --- UNTYPED generator, WITH the type view
 ;; (duplicate).  See rember-untyped-id-ty.scm for the experiment framing.
-;; duplicate-tyenv is not defined in termination-view3.scm (only rember/append
+;; duplicate-tyenv is not defined in views.scm (only rember/append
 ;; are), so we define it here -- the arrow type of the letrec-bound function
 ;; and its parameter, supplied to type-ofo/d even though the interpreter
 ;; template no longer carries the annotation.
@@ -11,7 +11,7 @@
 (load "restricted-interp-untyped.scm")
 (load "restricted-interp-untyped-following.scm")
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view4.scm") ; loads tv3 (=> tv2 => tv1) too
+(load "views.scm") ; R1+R2+TY+NV view definitions
 
 (define duplicate-tyenv '((duplicate . ((list) -> list)) (l . list)))
 

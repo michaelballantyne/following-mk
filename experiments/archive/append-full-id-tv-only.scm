@@ -11,7 +11,7 @@
 ;;     experiments/append-full-id-follower-tv.scm
 
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view.scm")
+(load "views.scm")
 
 (define (append-prog q body)
   `(letrec ([append (lambda (l s) : ((list list) -> list)

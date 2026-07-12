@@ -1,4 +1,8 @@
-;; termination-view5.scm --- rung 4b: parameter relevance / occurrence.
+;; negative-view-occurso.scm --- rung 4b: parameter relevance / occurrence.
+;;
+;; RECORDED NEGATIVE: this view was tried and did not earn its place in the
+;; stack; it is kept here for reference, not loaded by the *-full-id-views.scm
+;; arms.  See claude/2026-07-12-203500-rung4b-occurs-negative.md.
 ;;
 ;; Motivation (see claude/2026-07-12-202500-session-close.md, "Where to pick
 ;; up" item 1): the task encoding declares every recursive-function parameter
@@ -70,7 +74,7 @@
 ;;     free of the literal symbol `x` REFUTES here -- exactly the numeral-
 ;;     literal-variant-dies-free behaviour the rung is built for.
 
-(load "experiments/termination-view4.scm") ; loads tv3 (=> tv2 => tv1) too
+(load "views.scm") ; R1+R2+TY+NV view definitions
 
 ;; ------------------------------------------------------------------
 ;; occurso/d: does the symbol x occur anywhere in body's raw pair structure?
@@ -119,7 +123,7 @@
   (run 1 (h)
     (numbero h) ; main-level constraint, shared with the follower's constraint
                 ; store via h, exactly the pattern used for absento in the
-                ; rember-full-id-tv4ex examples.
+                ; rember-full-id-views examples.
     (follower h
       (occurso/d 'e `(match l ['() l] [(cons a d) (rember ,h d)]))))
   '())

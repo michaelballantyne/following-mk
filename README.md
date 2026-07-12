@@ -121,20 +121,37 @@ load.scm                          loads mk/ + following.scm
 following.scm                     conde/d, follower, counters, /d wrappers
 restricted-interp.scm             plain relational interpreter (Osera/Zdancewic)
 restricted-interp-following.scm   /d version of the same interpreter
+restricted-interp-untyped.scm     the interpreter without the letrec type
+                                  annotation (untyped-generator experiments)
+restricted-interp-untyped-following.scm  /d version of the untyped interpreter
+views.scm                         the follower "view" vocabulary: four /d
+                                  constraints (R1 base-case-patho/d, R2
+                                  decreasing-recursiono/d, TY type-ofo/d, NV
+                                  non-vacuous-testso/d) composed into a follower
+                                  alongside evalo/d; header documents the
+                                  R1/R2/TY/NV/EX shorthand
 test-all.scm                      loads and runs all test files
 tests/determinacy-goal-forms.scm  /d primitives: conde/d, fresh/d, conjunction, depth
+tests/guard-robustness.scm        conde/d guard edge cases
 tests/following-interpreter.scm   evalo/d: ground eval, partial eval, suspend/resume
 tests/refutation.scm              follower refutation with finite candidate sets
 tests/leading-following.scm       leader (evalo) + follower (evalo/d) interaction
+tests/untyped-interp.scm          the untyped interpreter + views over it
 synthesis/                        synthesis benchmarks (drive via run.sh)
 experiments/                      research experiments (drive via run.sh):
-                                    id-harness.scm       iterative deepening on term size
-                                    *-id-*.scm           size-closed synthesis arms
-                                    latin-square.scm     FD unit-propagation benchmark
-                                    termination-view.scm base-case-patho/d: a syntactic
-                                                         termination constraint composed
-                                                         into followers alongside evalo/d
-                                    *-seeded.scm         skeleton-seeded synthesis variants
+                                    id-harness.scm            iterative deepening on term size
+                                    <task>-full-id-views.scm  size-closed synthesis, full
+                                                              follower stack (R1+R2+TY+NV+EX)
+                                    <task>-full-id-nofollower.scm  the paired no-follower
+                                                              baseline for each task
+                                    <task>-untyped-id-{noty,ty}.scm  untyped-generator arms
+                                    new-tasks-gates.scm       per-view accept/refute gates
+                                                              for the wave-1 tasks
+                                    latin-square.scm          FD unit-propagation benchmark
+                                    negative-view-*.scm       recorded-negative views kept
+                                                              for reference (see claude/)
+                                    ablation.md, ablation-gen.py  the limiter ablation
+                                    archive/                  superseded arms (still runnable)
 run.sh                            driver for synthesis experiments
 claude/                           design notes and dated research log
 ```

@@ -1,6 +1,6 @@
-;; last-full-id-tv4ex.scm --- size-closed ID synthesis of `last`, the full
+;; last-full-id-views.scm --- size-closed ID synthesis of `last`, the full
 ;; follower stack (R1+R2+TY+NV) PLUS evalo/d over the examples, check-every 1.
-;; Mirrors experiments/rember-full-id-tv4ex.scm.
+;; Mirrors experiments/rember-full-id-views.scm.
 ;;
 ;; Task: last : ((list) -> number).  The last element of a (nonempty) list.
 ;;
@@ -24,9 +24,9 @@
 ;; Absento excludes example constants 5,6,7; the canonical body contains no
 ;; numeric literal >=3 (only the dead-branch 0 and pattern vars/params).
 ;;
-;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/last-full-id-tv4ex.scm
+;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/last-full-id-views.scm
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view4.scm") ; loads tv3 (=> tv2 => tv1) too
+(load "views.scm") ; R1+R2+TY+NV view definitions
 
 (define (last-prog q body)
   `(letrec ([last (lambda (l) : ((list) -> number)
@@ -35,7 +35,7 @@
 
 (define last-tyenv '((last . ((list) -> number)) (l . list)))
 
-(run-id "last-full/tv4ex" '(19 23 27 31 35 39 43 47 51 55) 1000
+(run-id "last-full/views" '(19 23 27 31 35 39 43 47 51 55) 1000
   (lambda (bound)
     (run 1 (q)
       (watch-size q)

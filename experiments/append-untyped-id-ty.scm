@@ -1,6 +1,6 @@
 ;; append-untyped-id-ty.scm --- UNTYPED generator, WITH the type view (append).
 ;; See rember-untyped-id-ty.scm for the experiment framing.  append-tyenv is
-;; defined in termination-view3.scm.
+;; defined in views.scm.
 ;;
 ;;   ./run.sh --check-follower-every 1 --main-unsound-depth 1000 \
 ;;     --timeout 240 experiments/append-untyped-id-ty.scm
@@ -8,7 +8,7 @@
 (load "restricted-interp-untyped.scm")
 (load "restricted-interp-untyped-following.scm")
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view4.scm") ; loads tv3 (=> tv2 => tv1); defines append-tyenv
+(load "views.scm") ; R1+R2+TY+NV; defines append-tyenv
 
 (define (append-prog-u q body)
   `(letrec ([append (lambda (l s)

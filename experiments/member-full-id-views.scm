@@ -1,7 +1,7 @@
-;; member-full-id-tv4ex.scm --- size-closed ID synthesis of `member?`, the full
+;; member-full-id-views.scm --- size-closed ID synthesis of `member?`, the full
 ;; follower stack (R1 base-case + R2 decreasing-recursion + TY types + NV
 ;; non-vacuous) PLUS evalo/d over the examples, check-every 1.  Mirrors
-;; experiments/rember-full-id-tv4ex.scm.
+;; experiments/rember-full-id-views.scm.
 ;;
 ;; Task: member? : ((number list) -> number).  Boolean-as-number: 1 if e occurs
 ;; in l, else 0.
@@ -29,9 +29,9 @@
 ;; Absento excludes only the example element constants >=3 (5,6); 0 and 1 are
 ;; permitted because they are answer literals.
 ;;
-;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/member-full-id-tv4ex.scm
+;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/member-full-id-views.scm
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view4.scm") ; loads tv3 (=> tv2 => tv1) too
+(load "views.scm") ; R1+R2+TY+NV view definitions
 
 (define (member-prog q body)
   `(letrec ([member (lambda (e l) : ((number list) -> number)
@@ -40,7 +40,7 @@
 
 (define member-tyenv '((member . ((number list) -> number)) (e . number) (l . list)))
 
-(run-id "member-full/tv4ex" '(11 15 19 23 27 31 35 39 43 47) 1000
+(run-id "member-full/views" '(11 15 19 23 27 31 35 39 43 47) 1000
   (lambda (bound)
     (run 1 (q)
       (watch-size q)

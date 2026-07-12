@@ -7,7 +7,7 @@
 (load "restricted-interp-untyped.scm")
 (load "restricted-interp-untyped-following.scm")
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view4.scm") ; loads tv3 (=> tv2 => tv1) too
+(load "views.scm") ; R1+R2+TY+NV view definitions
 
 (define (append-prog-u q body)
   `(letrec ([append (lambda (l s)

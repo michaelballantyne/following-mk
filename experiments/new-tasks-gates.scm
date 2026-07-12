@@ -13,10 +13,10 @@
 ;;       below the answer, just to prove the harness/follower stack executes.
 
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view4.scm") ; R1..R4 + tyenv examples
+(load "views.scm") ; R1..R4 + tyenv examples
 
 ;; ---------------------------------------------------------------------------
-;; program templates + tyenvs (mirror the six *-full-id-tv4ex.scm files)
+;; program templates + tyenvs (mirror the six *-full-id-views.scm files)
 ;; ---------------------------------------------------------------------------
 (define (member-prog q body)
   `(letrec ([member (lambda (e l) : ((number list) -> number) ,q)]) ,body))
@@ -240,7 +240,7 @@
           (evalo/d (rev-prog q '(rev (cons 5 (cons 6 '())) '())) '(6 5))))
       (evalo (rev-prog q '(rev (cons 5 (cons 6 '())) '())) '(6 5)))))
 
-;; interleave: R2 OMITTED (see interleave-full-id-tv4ex.scm header / R2 gate).
+;; interleave: R2 OMITTED (see interleave-full-id-views.scm header / R2 gate).
 (run-id "WIRE interleave(noR2)" '(11 15) 1000
   (lambda (bound)
     (run 1 (q)

@@ -1,9 +1,9 @@
 ;; interleave-full-id-nofollower.scm --- enumerative baseline arm: same task,
-;; examples, bounds, and absento exclusions as interleave-full-id-tv4ex.scm,
+;; examples, bounds, and absento exclusions as interleave-full-id-views.scm,
 ;; NO follower. Generated mechanically from that file; see it for the
 ;; task documentation.
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view4.scm") ; loads tv3 (=> tv2 => tv1) too
+(load "views.scm") ; R1+R2+TY+NV view definitions
 
 (define (interleave-prog q body)
   `(letrec ([interleave (lambda (l1 l2) : ((list list) -> list)

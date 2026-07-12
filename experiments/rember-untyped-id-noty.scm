@@ -7,7 +7,7 @@
 ;; (decreasing-recursiono/d) + NV (non-vacuous-testso/d) + EX (evalo-u/d over
 ;; the examples), but NO type-ofo/d.  Program template loses the `: type`
 ;; annotation.  Compare against rember-untyped-id-ty.scm (adds type-ofo/d) and
-;; the typed baseline rember-full-id-tv4ex.scm.
+;; the typed baseline rember-full-id-views.scm.
 ;;
 ;;   ./run.sh --check-follower-every 1 --main-unsound-depth 1000 \
 ;;     --timeout 240 experiments/rember-untyped-id-noty.scm
@@ -15,7 +15,7 @@
 (load "restricted-interp-untyped.scm")
 (load "restricted-interp-untyped-following.scm")
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view4.scm") ; loads tv3 (=> tv2 => tv1) too
+(load "views.scm") ; R1+R2+TY+NV view definitions
 
 (define (rember-prog-u q body)
   `(letrec ([rember (lambda (e l)

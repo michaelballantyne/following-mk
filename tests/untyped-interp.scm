@@ -9,7 +9,7 @@
 
 ;; Structural views R1 (base-case-patho/d) and R2 (decreasing-recursiono/d),
 ;; used in the composition gate below.  tv2 loads tv1.
-(load "experiments/termination-view2.scm")
+(load "views.scm")
 
 ;; Untyped program templates: NO `: type` annotation on the lambda.
 (define (rember-prog-u q body)

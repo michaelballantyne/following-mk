@@ -1,5 +1,5 @@
 ;; Arm B1: append-full, follower = base-case-patho/d + evalo/d (2 examples).
-(load "experiments/termination-view.scm")
+(load "views.scm")
 (define (append-prog q body)
   `(letrec ([append (lambda (l s) : ((list list) -> list)
                       ,q)])

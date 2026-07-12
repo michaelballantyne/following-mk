@@ -9,7 +9,7 @@
 ;;   ./run.sh --check-follower-every 20 --timeout 600 experiments/duplicate-id-tv3.scm
 
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view3.scm") ; loads tv2 (=> tv1) too
+(load "views.scm") ; loads tv2 (=> tv1) too
 
 (define (duplicate-prog q body)
   `(letrec ([duplicate (lambda (l) : ((list) -> list)

@@ -11,7 +11,7 @@
 ;;     experiments/rember-full-id-tv4.scm
 
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view4.scm") ; loads tv3 (=> tv2 => tv1) too
+(load "views.scm") ; loads tv3 (=> tv2 => tv1) too
 
 (define (rember-prog q body)
   `(letrec ([rember (lambda (e l) : ((number list) -> list)

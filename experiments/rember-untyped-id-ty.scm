@@ -4,7 +4,7 @@
 ;; TY (type-ofo/d) under rember-tyenv.  Types now live ONLY in this view: the
 ;; interpreter template carries no `: type` annotation, yet the arrow type of
 ;; the letrec-bound `rember` and its parameters is supplied to type-ofo/d via
-;; rember-tyenv (defined in termination-view3.scm).  This measures whether the
+;; rember-tyenv (defined in views.scm).  This measures whether the
 ;; type view flips from useless (fully overlapped, see ablation.md) to
 ;; load-bearing once type information is absent from generation.
 ;;
@@ -14,7 +14,7 @@
 (load "restricted-interp-untyped.scm")
 (load "restricted-interp-untyped-following.scm")
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view4.scm") ; loads tv3 (=> tv2 => tv1); defines rember-tyenv
+(load "views.scm") ; R1+R2+TY+NV; defines rember-tyenv
 
 (define (rember-prog-u q body)
   `(letrec ([rember (lambda (e l)

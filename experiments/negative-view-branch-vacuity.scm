@@ -1,4 +1,8 @@
-;; termination-view6.scm --- rung 4c: non-vacuous BRANCHES.
+;; negative-view-branch-vacuity.scm --- rung 4c: non-vacuous BRANCHES.
+;;
+;; RECORDED NEGATIVE: this view was tried and did not earn its place in the
+;; stack; it is kept here for reference, not loaded by the *-full-id-views.scm
+;; arms.  See claude/2026-07-12-204000-rung4c-negative-loop-converged.md.
 ;;
 ;; Motivation (see claude/2026-07-12-201800-duplicate-task-and-postviews-
 ;; spotcheck.md and the post-4a residue description in
@@ -36,7 +40,7 @@
 ;; NOT(ii) is "not both-match": we must FAIL when (t==c1 AND e==c2), and
 ;; FAIL when (t==c2 AND e==c1); stall while undetermined; succeed otherwise.
 ;; Encoded as an AND of two ORs, each OR itself a 2-clause conde/d exactly
-;; like `patho-oro/d` (termination-view.scm): both disjuncts refute -> the
+;; like `patho-oro/d` (views.scm): both disjuncts refute -> the
 ;; conde/d has no live clause -> refute; exactly one disjunct is
 ;; (dis)provably true -> commit it; both live -> nondeterministic -> stall.
 ;;   NOT(t==c1 AND e==c2)  =  (distinct t c1) OR (distinct e c2)
@@ -44,7 +48,7 @@
 ;; ANDing the two ORs (via conj/d*, which is exactly plain conjunction of
 ;; already-built /d goals -- used standalone the same way fresh/d uses it
 ;; internally) gives NOT(ii). See the file-header discussion in
-;; termination-view.scm for why the "both fail / one live / both live"
+;; views.scm for why the "both fail / one live / both live"
 ;; conde/d shape has the right stall discipline; the four-test gate suite at
 ;; the bottom of this file re-verifies it concretely on the new (t, e, c1,
 ;; c2) shape rather than trusting the analogy.
@@ -53,13 +57,13 @@
 ;; Same two as rung 4a (RECOGNIZED-CONSTRUCTS-ONLY; no fname/no-shadowing
 ;; machinery needed -- this view carries no by-name environment).
 
-(load "experiments/termination-view4.scm") ; brings fail/d-goal,
-                                            ; termination-view-app-keywords,
+(load "views.scm") ; brings fail/d-goal,
+                                            ; view-app-keywords,
                                             ; distinct-texto/d, and rungs 1-4a
 
 ;; ------------------------------------------------------------------
 ;; oro/d: plain two-way OR of two already-built /d goals, patho-oro/d style
-;; (termination-view.scm): both guards fail -> conde/d fails (REFUTE);
+;; (views.scm): both guards fail -> conde/d fails (REFUTE);
 ;; exactly one guard live -> commit it (ACCEPT); both live -> stall.
 ;; ------------------------------------------------------------------
 (define (oro/d g1 g2)
@@ -101,7 +105,7 @@
 
 ;; ------------------------------------------------------------------
 ;; the public relation: the whole-term walk (same clause structure as
-;; non-vacuous-testso/d in termination-view4.scm).
+;; non-vacuous-testso/d in views.scm).
 ;; ------------------------------------------------------------------
 (define (non-vacuous-brancheso/d body)
   (conde/d
@@ -145,7 +149,7 @@
     ([rator rands]
      [(==/d `(,rator . ,rands) body)
       (symbolo/d rator)
-      (absento/d rator termination-view-app-keywords)]
+      (absento/d rator view-app-keywords)]
      [(rands-non-vacuous-brancheso/d rands)])))
 
 ;;; ------------------------------------------------------------------

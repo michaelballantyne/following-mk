@@ -1,19 +1,18 @@
-;; rember-full-id-tv5.scm --- rung 4b added: size-closed ID with all five
-;; structural/type views (base-case, decreasing-recursion, types,
-;; non-vacuous-tests, occurs) PLUS evalo/d over the examples, check-every 1.
-;; Compare totals against experiments/rember-full-id-tv4ex.scm's cell
-;; (312,236 unify(main) / 7,899 conde(main)) to see whether the sixth
-;; conjunct (occurso/d 'e q) earns its keep.
-;;   ./run.sh --check-follower-every 1 --timeout 300 experiments/rember-full-id-tv5.scm
+;; rember-full-id-views.scm --- the current best configuration: size-closed ID
+;; with all four structural/type views PLUS evalo/d over the examples,
+;; check-every 1. Total to canonical answer: 312,236 unify(main) — 10.3x
+;; below the fair-search baseline. See
+;; claude/2026-07-12-204500-examples-earn-after-cleanup.md.
+;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/rember-full-id-views.scm
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view5.scm") ; loads tv4 (=> tv3 => tv2 => tv1) too
+(load "views.scm") ; R1+R2+TY+NV view definitions
 
 (define (rember-prog q body)
   `(letrec ([rember (lambda (e l) : ((number list) -> list)
                       ,q)])
      ,body))
 
-(run-id "rember-full/tv5" '(15 19 23 27 31 35 39 43 47 51) 1000
+(run-id "rember-full/views" '(15 19 23 27 31 35 39 43 47 51) 1000
   (lambda (bound)
     (run 1 (q)
       (watch-size q)
@@ -29,7 +28,6 @@
           (decreasing-recursiono/d 'rember '(e l) q)
           (type-ofo/d rember-tyenv q 'list)
           (non-vacuous-testso/d q)
-          (occurso/d 'e q)
           (evalo/d (rember-prog q '(rember 5 '())) '())
           (evalo/d (rember-prog q '(rember 6 (cons 6 '()))) '())
           (evalo/d (rember-prog q '(rember 7 (cons 3 (cons 4 (cons 7 (cons 6 '())))))) '(3 4 6))

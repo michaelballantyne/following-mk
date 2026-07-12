@@ -2,7 +2,7 @@
 ;; Isolates the termination view's contribution: the leader still checks the
 ;; 4 examples via evalo; the follower only refutes caseless bodies.
 ;; Loads experiments/termination-view.scm (definitions + self-checks) first.
-(load "experiments/termination-view.scm")
+(load "views.scm")
 (define (rember-prog q body)
   `(letrec ([rember (lambda (e l) : ((number list) -> list)
                       ,q)])

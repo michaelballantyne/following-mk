@@ -1,6 +1,6 @@
-;; swap-full-id-tv4ex.scm --- size-closed ID synthesis of `swap-pairs`, the full
+;; swap-full-id-views.scm --- size-closed ID synthesis of `swap-pairs`, the full
 ;; follower stack (R1+R2+TY+NV) PLUS evalo/d over the examples, check-every 1.
-;; Mirrors experiments/rember-full-id-tv4ex.scm.  This is the BIGGEST answer in
+;; Mirrors experiments/rember-full-id-views.scm.  This is the BIGGEST answer in
 ;; the suite.
 ;;
 ;; Task: swap : ((list) -> list).  Swap adjacent pairs; a final odd element is
@@ -36,9 +36,9 @@
 ;; Kept the header canonical for the gates (it must still be ACCEPTED by all
 ;; views), but expected answer bound is 63, not 75.
 ;;
-;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/swap-full-id-tv4ex.scm
+;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/swap-full-id-views.scm
 (load "experiments/id-harness.scm")
-(load "experiments/termination-view4.scm") ; loads tv3 (=> tv2 => tv1) too
+(load "views.scm") ; R1+R2+TY+NV view definitions
 
 (define (swap-prog q body)
   `(letrec ([swap (lambda (l) : ((list) -> list)
@@ -47,7 +47,7 @@
 
 (define swap-tyenv '((swap . ((list) -> list)) (l . list)))
 
-(run-id "swap-full/tv4ex" '(43 47 51 55 59 63 67 71 75 79) 1000
+(run-id "swap-full/views" '(43 47 51 55 59 63 67 71 75 79) 1000
   (lambda (bound)
     (run 1 (q)
       (watch-size q)
