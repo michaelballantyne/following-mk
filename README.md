@@ -121,6 +121,15 @@ Only three spots in `mk/mk.scm` are patched to support followers: the
 threads `F` through, and `conde` calls `(trigger-followers)` before
 branching so stashed followers can re-fire at each choice point.
 
+## Setup
+
+Chez Scheme 9.5.8+ is required. On Debian/Ubuntu, `apt-get install
+chezscheme` works (the binary is named `chezscheme` there; `run.sh`
+looks for `chez`, then `chezscheme`, and `$CHEZ` overrides). The test
+suite and benchmarks have no other dependencies. Optional: Racket's
+`raco fmt` for autoformatting (config in `.fmt.rkt`, details in
+`CLAUDE.md`).
+
 ## Running
 
 Chez resolves `load` paths against the working directory, so always run
