@@ -49,13 +49,13 @@ views, coverage) are parked in Next behind broadening.
 
 ## Now
 
-- [~] **Untyped-interpreter factoring** (in flight this session) —
-  untyped `evalo-u`/`evalo-u/d` variants; type info lives only in
-  `type-ofo/d`. Testable claim: TY flips from fully-overlapped to
-  load-bearing; distance untyped+TY vs typed-full measures
-  checking-time vs generation-time cost of the same information.
-  Then: rerun rung-4b relevance ablation against the untyped stack
-  (kept alive for exactly this scenario).
+- [ ] **Adopt untyped+TY as the default architecture** (follow-through
+  on the factoring result, `...-212000-untyped-factoring-results.md`):
+  (a) re-run rung-4b relevance ablation against the untyped stack (the
+  negative was typed-stack-specific by design); (b) run the wave-1
+  benchmark tasks under untyped+TY as well as typed; (c) small
+  instrumentation item: per-view refute/force attribution counters
+  (unify(f) is currently the only proxy).
 
 - [~] **Benchmark broadening, wave 1** (in flight this session;
   moved up from Next per directive): member? (boolean-as-number),
@@ -67,30 +67,6 @@ views, coverage) are parked in Next behind broadening.
   Then the differentiating class: bidirectionality-essential tasks
   (backward/partial-output specs) — the ground where
   enumerate-and-test has no natural entry.
-
-- [ ] **Ablation follow-ups** (`experiments/ablation.md`, keep it
-  current as limiters/tasks arrive): (a) is TY worth keeping? Fully
-  overlapped on refutation (LOO-TY ≈ full everywhere) but uniquely
-  *forces* — find where forcing pays or drop it from the default
-  stack. Diagnosis (Michael's question, confirmed): the interpreter is
-  a TYPED interpreter and also the generator, so type information is
-  spent at generation time; TY only sees the small window of
-  committed-but-not-yet-evaluated structure. Testable claim: a type
-  view pays in proportion to how untyped the generator is — try an
-  UNTYPED evalo variant and watch TY flip from useless to major.
-  Architectural corollary: factoring the typed interpreter into
-  untyped-evaluator view + type view carries the same information
-  with attributable contributions (identity #2 applied to the
-  interpreter itself); (b) rung 4b occurs/relevance: DONE, recorded NEGATIVE — correct but
-  -1.6% main at +22% follower cost; the family is already dead against
-  the installed stack (`...-203500-rung4b-occurs-negative.md`; kept
-  for the untyped-interpreter scenario); (c) 4c branch-value vacuity: DONE, second recorded
-  NEGATIVE — zero marginal cut (completed no-op wrappers live above
-  the answer bound; partials die to EX for other reasons;
-  `...-204000-rung4c-negative-loop-converged.md`). **The reduction
-  loop has converged on rember at 312,236 unify(main)**; next
-  reductions need new information: richer example specs,
-  untyped-interpreter factoring, broader benchmarks.
 
 
 - [ ] **Rung 4: canonicity + relevance views.** Post-3-views stream
@@ -225,6 +201,24 @@ views, coverage) are parked in Next behind broadening.
 ## Resolved
 
 All 2026-07-12 unless noted; details in the linked entries.
+
+- ~~Is TY worth keeping / untyped-interpreter factoring~~ — YES, and
+  the factoring is free: untyped generator + type-ofo/d matches
+  typed-full within ~2% on all three tasks; TY flips from
+  fully-overlapped to 8.3× on rember (task-specific: 1.18× append,
+  ~1.07× duplicate); no ill-typed answer ever surfaces (TY is
+  efficiency, not correctness, on this suite). Checking-time types ≈
+  generation-time types. Rungs 4b (occurso, negative vs typed stack)
+  and 4c (branch vacuity, zero cut) closed earlier same day.
+  `...-212000-untyped-factoring-results.md`.
+
+- ~~Do we need CDCL / stronger-than-unit propagation?~~ — Not now, and
+  mostly not CDCL: ID re-refutation capped at 2.74× (per-level
+  measurement) and owned by explicit search; views are hand-learned
+  position-generic lemmas that saturated the current suite and
+  transfer across tasks; stall-time lookahead predicted low-yield
+  outside FD. Falsifiable revisit-triggers recorded.
+  `...-211500-cdcl-evaluation.md`.
 
 - ~~Why is check-every=1 catastrophic?~~ — it isn't, except under fair
   search: chain-growth falsified (worklists bounded at 3–4, flat
