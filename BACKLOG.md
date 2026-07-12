@@ -1,9 +1,11 @@
 # Backlog
 
 Roughly-prioritized open questions and experiments. Draw new items from
-recent [`claude/`](claude/) notebook entries, `TODO.md`, and the research-goal
+recent [`claude/`](claude/) notebook entries and the research-goal
 framing in [`README.md`](README.md). An item resolves when answered *either
 way*; move it to Resolved with a one-line answer + link to the `claude/` entry.
+Current priority order is set by the reflection
+`claude/2026-07-12-220000-reflection-after-factoring-and-wave1.md`.
 
 **Project identity** (Michael, 2026-07-12) — the two distinguishing
 factors to maintain, whatever the search strategy becomes:
@@ -44,74 +46,57 @@ optimization. Mere-inefficiency overhead stays out of scope.
 information sources as new views, (3) whether unit propagation needs
 strengthening (CDCL). And: **expand the synthesis benchmark suite
 before diving into anything complex beyond the untyped-interpreter
-work** — the survey-note ideas (symbolic examples, abstract-domain
-views, coverage) are parked in Next behind broadening.
+work**. All four explored same session; symbolic examples got folded
+into the wave-2 Now item, the other survey ideas (abstract-domain
+views, coverage) wait in Next.
 
 ## Now
 
-- [ ] **Adopt untyped+TY as the default architecture** (follow-through
-  on the factoring result, `...-212000-untyped-factoring-results.md`):
-  (a) re-run rung-4b relevance ablation against the untyped stack (the
-  negative was typed-stack-specific by design); (b) run the wave-1
-  benchmark tasks under untyped+TY as well as typed; (c) small
-  instrumentation item: per-view refute/force attribution counters
-  (unify(f) is currently the only proxy).
+(ordered per the 2026-07-12 reflection)
 
-- [ ] **Generalize the termination view beyond fixed-position
+- [ ] **1. Generalize the termination view beyond fixed-position
   decrease** (wave 1's one new view-shaped need,
   `...-214500-benchmark-wave1-results.md` finding 4): interleave's
   argument-swapping recursion is soundly refuted by R2, and the
   R2-less stack is *infeasible* — the view is load-bearing for
-  feasibility. Candidate measures, as /d views: total-size/multiset
-  decrease across all arguments; lexicographic orders over argument
-  permutations. Gate on interleave + all existing canonicals.
+  feasibility, and it gates wave-2 benchmark breadth. Candidate
+  measures, as /d views: total-size/multiset decrease across all
+  arguments; lexicographic orders over argument permutations. Gate on
+  interleave + all existing canonicals.
 
-- [ ] **Benchmark wave 2: bidirectionality-essential tasks** — the
-  priority-2 item of the reflection
+- [ ] **2. Benchmark wave 2: bidirectionality-essential tasks**
   (`...-220000-reflection-after-factoring-and-wave1.md`): identity #1
   is unexercised by all nine current tasks, and backward/partial-
   output specs should flip the follower from mostly-refuting to
-  forcing. Design the spec class (run-backward queries, partial
+  forcing — do this before committing to view designs tuned on
+  forward tasks. Design the spec class (run-backward queries, partial
   outputs, relation synthesis, Barliman-style), then fold into its
-  measurement pass: (a) untyped+TY port of wave 1, (b) surviving-
-  stream sampling (standing practice), (c) **symbolic/parametric
-  examples** (survey #1 — itself a richer-spec mechanism, and the
-  structural fix for the evens-style spec failure).
+  measurement pass, which runs under **untyped+TY as the default
+  architecture** (`...-212000-untyped-factoring-results.md`):
+  (a) untyped+TY port of wave 1; (b) surviving-stream sampling
+  (standing practice); (c) **symbolic/parametric examples** (survey
+  #1 — itself a richer-spec mechanism, the structural fix for the
+  evens-style spec failure, and the source of the missing
+  same-l/different-e information); (d) re-run the rung-4b
+  relevance ablation against the untyped stack (the recorded negative
+  was typed-stack-specific by design) and, if it now bites, the
+  full dataflow-relevance view design (Myth-style, canonicity
+  framing); (e) per-view refute/force attribution counters (small
+  instrumentation — unify(f) is currently the only proxy).
 
-
-- [ ] **Rung 4: canonicity + relevance views.** Post-3-views stream
-  spot check (rember levels 35-43): ~33% is vacuous-condition
-  boilerplate `(if (= X X) ...)` (dead else; equivalent smaller
-  candidate already enumerated — cutting is minimal-answer-preserving)
-  and ~20-25% is e-unreachable recursive branches (plus numeral
-  literals absento-barred from ever equalling any example's e).
-  (a) non-vacuous-testso/d: DONE (1.61x further on rember;
-  `...-203000-rung4a-vacuous-conditions.md`); (b) relevance view
-  (params must be dataflow-reachable) — needs a design pass on
-  soundness framing (canonicity restriction, Myth-style relevance). Also: add an example
-  pair with same l, different e — the current suite cannot refute
-  e-independence at all.
-
-- [ ] **Explicit search strategies** (Michael's direction: interested
-  in other searches even if mk's implicit heuristics must be recovered
-  manually). The ID harness is the crude first instance; design the
-  next: a size/cost-frontier priority queue over a first-order
-  representation of the search, with the views as the pruning/forcing
-  layer. Today's map of what mk's interleaving was implicitly doing —
-  geometric demotion of deep spines (→ replaced soundly by the
-  termination view), ordering luck (→ replaced by the size guarantee),
-  completeness via fairness (→ levels complete by construction) — is
-  the checklist of heuristics to recover explicitly. Neither project
+- [ ] **3. First-order representation of the /d search, steps 1–2,
+  then the explicit scheduler on top.** Design note:
+  `claude/2026-07-12-200500-first-order-rep-design.md`; green-lit by
+  Michael on conceptual-clarity grounds; memory-sharing half is
+  measurement-enabling; speed half stays deprioritized; step 2's
+  printable follower trees also upgrade the sampling loop. The
+  scheduler that follows (size/cost-frontier priority queue with
+  views as the pruning/forcing layer) recovers mk's implicit
+  heuristics explicitly: geometric demotion of deep spines → the
+  termination view; ordering luck → the size guarantee; completeness
+  via fairness → levels complete by construction. Neither project
   identity constrains the scheduler; protect the relational substrate
   the views compose in, not the interleaving.
-
-- [ ] **First-order representation of the /d search** — design note
-  written (`claude/2026-07-12-200500-first-order-rep-design.md`).
-  Standing: green-lit by Michael on conceptual-clarity grounds
-  ("easier to think about"), and its memory-sharing half is
-  measurement-enabling (the pre-view OOMs blocked whole experiment
-  cells). Its speed half stays deprioritized. Good next-session
-  opener.
 
 ## Next
 
@@ -223,6 +208,12 @@ views, coverage) are parked in Next behind broadening.
 ## Resolved
 
 All 2026-07-12 unless noted; details in the linked entries.
+
+- ~~Rung 4a: non-vacuous conditions view~~ — built, 1.61× further on
+  rember; with 4b/4c negatives it closed the canonicity family (the
+  reduction loop converged on rember). The remaining rung-4 half
+  (dataflow relevance) moved into the wave-2 item, to be evaluated
+  against the untyped stack. `...-203000-rung4a-vacuous-conditions.md`.
 
 - ~~Benchmark broadening wave 1 (build + first measurements)~~ — six
   tasks added (member?, last, swap-pairs, evens, rev-acc, interleave);
