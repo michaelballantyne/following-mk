@@ -39,7 +39,34 @@ its numbers (as every pre-view follower-ID config did) leaves the
 pruning question unanswered, and fixing that is reductions work, not
 optimization. Mere-inefficiency overhead stays out of scope.
 
+**Session directive** (Michael, 2026-07-12, this session): explore
+(1) factoring the typechecker out of the interpreter, (2) additional
+information sources as new views, (3) whether unit propagation needs
+strengthening (CDCL). And: **expand the synthesis benchmark suite
+before diving into anything complex beyond the untyped-interpreter
+work** — the survey-note ideas (symbolic examples, abstract-domain
+views, coverage) are parked in Next behind broadening.
+
 ## Now
+
+- [~] **Untyped-interpreter factoring** (in flight this session) —
+  untyped `evalo-u`/`evalo-u/d` variants; type info lives only in
+  `type-ofo/d`. Testable claim: TY flips from fully-overlapped to
+  load-bearing; distance untyped+TY vs typed-full measures
+  checking-time vs generation-time cost of the same information.
+  Then: rerun rung-4b relevance ablation against the untyped stack
+  (kept alive for exactly this scenario).
+
+- [~] **Benchmark broadening, wave 1** (in flight this session;
+  moved up from Next per directive): member? (boolean-as-number),
+  last (dead nil-branch — coverage-view fodder), swap-pairs (nested
+  match, biggest answer), evens, rev-acc (accumulator param),
+  interleave (argument-swapping recursion — expected to expose R2's
+  fixed-position restriction). Full-stack tv4ex-pattern arms + gates
+  first; ID measurements + baseline arms + stream sampling after.
+  Then the differentiating class: bidirectionality-essential tasks
+  (backward/partial-output specs) — the ground where
+  enumerate-and-test has no natural entry.
 
 - [ ] **Ablation follow-ups** (`experiments/ablation.md`, keep it
   current as limiters/tasks arrive): (a) is TY worth keeping? Fully
@@ -102,6 +129,25 @@ optimization. Mere-inefficiency overhead stays out of scope.
 
 ## Next
 
+- [ ] **Symbolic/parametric examples** (info-sources survey #1,
+  `claude/2026-07-12-210000-info-sources-survey.md`): examples with
+  fresh vars + =/=/absento — class A, nearly free, supplies the
+  missing same-l/different-e information; refutation up, forcing
+  possibly down (=-on-symbolic stalls). Parked behind benchmark
+  broadening per directive.
+
+- [ ] **Length-domain abstract view** (survey #2): eval-lengtho/d
+  over auto-abstracted examples; dense-forcing hypothesis on
+  element-blind tasks (duplicate/append/evens/interleave); the
+  join-tension (rember stalls at element tests) is the thing to
+  measure. Parked behind broadening.
+
+- [ ] **Coverage/adequacy view via trace reification** (survey #3):
+  class-B cut of unexercised-branch junk that NOTHING in the current
+  stack can see; also the architectural probe of store-mediated
+  view-to-view communication. Rises in priority once branchier tasks
+  (last, swap-pairs) are measured.
+
 - [ ] **Fix the productivity tally.** Constraint-only commits
   (symbolo/=/= etc.) are invisible to the walk*-based check — B2-ce1
   scored 221k/221k triggers "unproductive" while doubling main-search
@@ -146,13 +192,20 @@ optimization. Mere-inefficiency overhead stays out of scope.
   written with unverified citations; check before citing externally.
   Reading shortlist inside: SMyth, Blaze, Burst, SyRup, Neural-Guided
   CLP.
-- **mkcdcl revival (conditional)** — if refutation turns out to need
-  learned *reasons* (CDCL lemmas) beyond checks. Known limitations of
-  the prototype (Michael): same divergence gap (now addressed by the
-  view), prune-only (no propagation — the expensive half to miss),
-  disequality provenance blow-up. First-order rep is the natural
-  provenance substrate; confining provenance to the follower still
-  looks right. Repo: git@github.com:michaelballantyne/mkcdcl.git.
+- **mkcdcl revival (conditional)** — evaluated 2026-07-12
+  (`claude/2026-07-12-211500-cdcl-evaluation.md`): verdict *not now,
+  and mostly not CDCL* — ID re-refutation is capped at ~2.7× and owned
+  by explicit search; hand-written views saturated the shared-reason
+  families on the current suite and transfer across tasks; stall-time
+  lookahead predicted low-yield outside FD. Sharpened triggers to
+  revisit: (1) broadened benchmarks keep producing task-specific
+  refutation families (measure: refuted-candidate logging hook +
+  syntactic clustering), or (2) the explicit scheduler's profile shows
+  heavy same-reason refutation across non-prefix-shared contexts.
+  Known prototype limitations (Michael): divergence gap (now addressed
+  by the view), prune-only, disequality provenance blow-up. First-order
+  rep is the provenance substrate either way (third motivation).
+  Repo: git@github.com:michaelballantyne/mkcdcl.git.
 - **Env-plumbing removal** (tagged applications, cheaper lookup) —
   95.7% of suspend cutoffs, a third of guard work; matters whenever
   evalo/d is a heavy view again.
