@@ -57,10 +57,13 @@ optimization. Mere-inefficiency overhead stays out of scope.
   interpreter itself); (b) rung 4b occurs/relevance: DONE, recorded NEGATIVE — correct but
   -1.6% main at +22% follower cost; the family is already dead against
   the installed stack (`...-203500-rung4b-occurs-negative.md`; kept
-  for the untyped-interpreter scenario); (c) 4c branch-value vacuity
-  `(if (= x e) x e)` — in flight; survives examples BY CONSTRUCTION
-  (behaviorally-correct-but-non-minimal), so unlike 4b its ~11%
-  post-4a estimate is not overlapped by EX.
+  for the untyped-interpreter scenario); (c) 4c branch-value vacuity: DONE, second recorded
+  NEGATIVE — zero marginal cut (completed no-op wrappers live above
+  the answer bound; partials die to EX for other reasons;
+  `...-204000-rung4c-negative-loop-converged.md`). **The reduction
+  loop has converged on rember at 312,236 unify(main)**; next
+  reductions need new information: richer example specs,
+  untyped-interpreter factoring, broader benchmarks.
 
 
 - [ ] **Rung 4: canonicity + relevance views.** Post-3-views stream
