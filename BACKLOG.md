@@ -31,16 +31,6 @@ own baseline; fair work metric = unify(main)/conde(main).
 
 ## Now
 
-- [ ] **Typechecker as the third view (rung 3).** Promoted from Next:
-  with the termination ladder covering divergence (depth-cut now 0),
-  the remaining forcing gap at partial holes is types — examples
-  cannot force program text (many-to-one), types can (`(rember e a)`
-  passes rung 2, is ill-typed). The restricted language already
-  carries annotations; write the type relation /d-style and conjoin it
-  as the third follower view next to rungs 1+2. Measure on the ID
-  regime (where savings convert) and check forcing via productive
-  triggers — after fixing the tally (below).
-
 - [ ] **Explicit search strategies** (Michael's direction: interested
   in other searches even if mk's implicit heuristics must be recovered
   manually). The ID harness is the crude first instance; design the
@@ -126,6 +116,14 @@ own baseline; fair work metric = unify(main)/conde(main).
 ## Resolved
 
 All 2026-07-12 unless noted; details in the linked entries.
+
+- ~~Typechecker as the third view (rung 3)~~ — built (`type-ofo/d`),
+  gates pass; −7.5% unify on top of rungs 1+2, and the project's
+  first *propagation* signal (type-forcing of holes; examples can't
+  force, many-to-one). Marginal returns decreasing — next lever is
+  explicit search, not a fourth view. Includes the counter-
+  contamination incident + fix (`without-unify-counting`).
+  `...-194500-rung3-types-and-counter-contamination.md`.
 
 - ~~Rung 2: structurally-decreasing recursion~~ — built
   (`decreasing-recursiono/d`, fixed-position via conde/d over
