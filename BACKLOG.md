@@ -31,16 +31,15 @@ own baseline; fair work metric = unify(main)/conde(main).
 
 ## Now
 
-- [ ] **Rung 2 of the termination ladder: structurally-decreasing
-  recursion.** The single highest-leverage addition identified by
-  counters: rember ID levels 39/43 dominate total cost (52M of 57.6M
-  unify) and still show depth-cut 918/3160 — candidates with base
-  cases that diverge at runtime (recursive calls on non-decreasing
-  args), unrefutable by examples, syntactically refutable by requiring
-  self-call args to descend from the match scrutinee's cons-parts.
-  Extend `base-case-patho/d` (needs scrutinee/pattern-var provenance
-  through the term walk). Prediction: collapses the dominant levels
-  the way rung 1 collapsed the divergent spines.
+- [ ] **Typechecker as the third view (rung 3).** Promoted from Next:
+  with the termination ladder covering divergence (depth-cut now 0),
+  the remaining forcing gap at partial holes is types — examples
+  cannot force program text (many-to-one), types can (`(rember e a)`
+  passes rung 2, is ill-typed). The restricted language already
+  carries annotations; write the type relation /d-style and conjoin it
+  as the third follower view next to rungs 1+2. Measure on the ID
+  regime (where savings convert) and check forcing via productive
+  triggers — after fixing the tally (below).
 
 - [ ] **Explicit search strategies** (Michael's direction: interested
   in other searches even if mk's implicit heuristics must be recovered
@@ -63,13 +62,6 @@ own baseline; fair work metric = unify(main)/conde(main).
   first: what the tree looks like, what survives across triggers.
 
 ## Next
-
-- [ ] **Typechecker as a composed view.** The long-standing TODO item,
-  now concretely motivated as the third view (identity #2) and by the
-  literature contrast (Myth/Synquid get their power from types). The
-  restricted language already has annotations. Which of
-  evaluator/typechecker leads, per the old question — or do they
-  simply compose symmetrically like evalo/d + base-case-patho/d did?
 
 - [ ] **Fix the productivity tally.** Constraint-only commits
   (symbolo/=/= etc.) are invisible to the walk*-based check — B2-ce1
@@ -121,13 +113,36 @@ own baseline; fair work metric = unify(main)/conde(main).
   (the product is symmetric by construction).
 - Name/document the inf/d return type; rename `case-inf/d`/`stream`.
 - Verify set-var-val! is genuinely disabled on the /d path.
-- Remove `*unsound-fail-depth*`? Still unused; `*main-unsound-depth*`
-  earned its keep today (level-finiteness), this one didn't.
+- Remove `*unsound-fail-depth*`? Still unused. And with rungs 1+2,
+  `*main-unsound-depth*` never fires on the benchmark suite either
+  (depth-cut 0) — both unsound knobs are now candidates for demotion
+  to pure diagnostics or removal.
+- Harder benchmarks for the now-cheap sound enumerative regime —
+  grow the suite past rember/append (more examples, bigger targets,
+  maybe two-recursion tasks) and watch which view starts failing to
+  force.
 - Racket port — only if Chez friction hurts again.
 
 ## Resolved
 
 All 2026-07-12 unless noted; details in the linked entries.
+
+- ~~Rung 2: structurally-decreasing recursion~~ — built
+  (`decreasing-recursiono/d`, fixed-position via conde/d over
+  positions); rember ID 57.6M → 2.62M unify (22×, 69× wall);
+  depth-cut 0 everywhere; **size-guaranteed search now cheaper than
+  fair search on both tasks** (2.62M vs 3.2M; 248k vs 443k). Fair-
+  search probe: refutes there too (5,629) but flat work — refutation
+  converts only where candidates are paid in full.
+  `...-193500-rung2-decreasing-recursion.md`.
+- ~~Guard-robustness tests~~ — 8 tests added (suite 42); invariants
+  hold; one sound generalization found and documented (sole-survivor
+  commit with retained nondet-guard obligation).
+  `...-192500-guard-robustness-sole-survivor-rule.md`.
+- ~~Fair-search population w/ view (Michael's sampling round 2)~~ —
+  rung 1 OR-neutralized by the committed clean base case; work
+  concentrates in the e2 slot; rung-2 prediction made and confirmed.
+  `...-190500-fair-population-view-neutralized.md`.
 
 - ~~Size-bounded ID rescues pruning~~ — falsified as posed (follower
   savings *shrank* to 1.5×; memory-infeasible; low bounds
