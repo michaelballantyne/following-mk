@@ -120,6 +120,17 @@ performance gains. Fair work metric: `unify (main)` / `conde (main)`
   candidate for the gigabyte-retention problem.
 - Related-work positioning note: dKanren, Lozov's work, mkcdcl,
   backjumping-miniKanren, underconstraints, Andorra, guanxi.
+- **mkcdcl revival (conditional).** Michael's prior mk+SAT/CDCL
+  prototype (git@github.com:michaelballantyne/mkcdcl.git). Known
+  limitations from that effort: same divergent-branch problem we
+  measured today (needs the termination view first); prune-only — no
+  unit propagation, and propagation is where today's big wins came
+  from; disequality provenance blew up in complexity (unification-only
+  likely). Revisit IF post-termination-view results suggest refutation
+  needs learned *reasons* (CDCL) rather than just checks; the
+  first-order /d representation would be the natural substrate for
+  provenance, and Michael's old idea of confining provenance tracking
+  to the infrequently-fired follower search still looks right.
 - Name and document the inf/d return type (not a stream — never splits);
   rename `case-inf/d` and `stream` variable names to match.
 - Separate interpreter and typechecker for the same language as
