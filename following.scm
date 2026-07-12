@@ -841,16 +841,32 @@
 ;;; --- per-view attribution tally (tally/d)
 ;;;
 ;;; (tally/d label goal) wraps a /d goal TRANSPARENTLY -- identical search
-;;; behavior; it evaluates the wrapped goal exactly once per invocation and
-;;; returns its inf/d result unchanged -- while attributing two per-label
-;;; events to `label` (a symbol such as 'R1, 'TY, 'EX):
+;;; behavior -- while attributing two per-label events to `label` (a symbol
+;;; such as 'R1, 'TY, 'EX):
 ;;;
-;;;   refute -- the wrapped goal's /d evaluation FAILS on this invocation
-;;;             (returns #f), which fails the follower conjunction on this
-;;;             branch.
-;;;   force  -- the wrapped goal COMMITS a store change: the committed result
-;;;             state's substitution map OR constraint store is not eq? to the
-;;;             entry state's, i.e. a binding or a constraint was added.
+;;;   refute -- an evaluation step of the wrapped goal FAILS (returns #f),
+;;;             which fails the follower conjunction on this branch.
+;;;   force  -- an evaluation step COMMITS a store change: the result state's
+;;;             substitution map OR constraint store is not eq? to the entry
+;;;             state's, i.e. a binding or a constraint was added.
+;;;
+;;; "Evaluation step" covers BOTH the initial evaluation at follower
+;;; installation AND every RE-FIRE of a stalled view at later trigger points:
+;;; when a step suspends (soft `(st . thunk)` or hard-suspended), tally/d
+;;; REBUILDS the suspension with its resume thunk re-wrapped under the same
+;;; label, so the label rides inside the worklist items conj/d-run stashes
+;;; (soft and hard) and inside the follower resume stored in state-F.  The
+;;; label is captured in the wrapper closure at item-creation time -- no
+;;; dynamic extent is relied on across the suspension boundary -- and each
+;;; resumed step re-wraps ITS OWN suspensions, so the chain survives any
+;;; number of stall/resume rounds and conj/d-resume repackagings.  (This
+;;; matters: nearly all view activity -- the refutes and forces -- happens on
+;;; resumption, not at installation; an initial-evaluation-only tally sees one
+;;; 'force per example goal and nothing else.)  Goals not wrapped in tally/d
+;;; put unlabeled thunks in the same worklists and count nothing.  Children
+;;; spawned inside the wrapped goal (fresh/d, nested conde/d bodies) are part
+;;; of its evaluation step; the only thing that escapes to the enclosing
+;;; worklist is the suspension thunk, which carries the label.
 ;;;
 ;;; The force test is exactly conj/d-run's `changed?` fixpoint test: an
 ;;; identity comparison on (subst-map (state-S st)) and (state-C st).  It is
@@ -858,19 +874,21 @@
 ;;; tally/d needs no `without-unify-counting` guard and adds near-zero
 ;;; unify(main)/unify(follower) -- contrast the reify-based productivity tally,
 ;;; whose reify IS a hidden unify consumer.  Verified: bound-15
-;;; rember-full-id-views is byte-identical (unify-main / conde-main) with all
-;;; five views tally-wrapped vs untallied.
+;;; rember-full-id-views is byte-identical (unify-main / conde-main /
+;;; unify-follower) with all five views tally-wrapped vs untallied.
 ;;;
-;;; Event counted for each of the four inf/d outcomes of the wrapped goal:
-;;;   #f (fail)         -> refute++            (return value: #f, unchanged)
+;;; Event counted for each of the four inf/d outcomes of one step:
+;;;   #f (fail)         -> refute++           (returned unchanged)
 ;;;   state (singleton) -> force++ iff store changed vs entry
-;;;   (state . thunk)   -> force++ iff store changed vs entry
-;;;   hard-suspended    -> force++ iff store changed vs entry
-;;; A STALL returns the ENTRY state unchanged -- conde/d's `nondeterministic`
-;;; yields (cons st thunk) with the same st, and a suspend-depth cutoff yields
-;;; (make-hard-suspended st ...) with the same st -- so its store is eq? to
-;;; entry and NEITHER counter moves.  That is the intended three-way split:
-;;; refute / force / (stall = neither).
+;;;   (state . thunk)   -> force++ iff store changed vs entry;
+;;;                        thunk re-wrapped under the label
+;;;   hard-suspended    -> force++ iff store changed vs entry;
+;;;                        thunk re-wrapped under the label
+;;; A pure STALL step returns the ENTRY state unchanged -- conde/d's
+;;; `nondeterministic` yields (cons st thunk) with the same st, and a
+;;; suspend-depth cutoff yields (make-hard-suspended st ...) with the same st
+;;; -- so its store is eq? to entry and NEITHER counter moves.  That is the
+;;; intended three-way split: refute / force / (stall = neither).
 ;;;
 ;;; KNOWN BLIND SPOTS (consequences of the cheap store-identity choice):
 ;;;   1. INTERNAL FRESH-VAR BINDINGS COUNT AS FORCE.  The set-var-val!
@@ -884,14 +902,14 @@
 ;;;      aggregate *externally-productive-trigger-counter* is the term-level
 ;;;      metric that excludes these; tally/d is the cheap per-view metric that
 ;;;      does not.
-;;;   2. PER-INVOCATION, NOT PER-DISTINCT-DECISION.  A view that stalls can be
+;;;   2. PER-STEP, NOT PER-DISTINCT-DECISION.  A view that stalls is
 ;;;      re-evaluated at later triggers and within conj/d-run's fixpoint
-;;;      iterations; each re-evaluation is counted afresh.  Counts are
-;;;      evaluation frequencies, not counts of distinct candidate outcomes.
+;;;      iterations; each evaluation step is counted afresh.  Counts are
+;;;      step frequencies, not counts of distinct candidate outcomes.
 ;;;   3. SURVIVAL IS LOCAL.  A commit counted here may later be discarded by a
 ;;;      subsequent conjunct in the follower failing.  "in a commit that
-;;;      survives" is therefore approximate: it survives the wrapped goal, not
-;;;      necessarily the whole follower branch.
+;;;      survives" is therefore approximate: it survives the wrapped goal's
+;;;      step, not necessarily the whole follower branch.
 
 ;; label -> (refute-count . force-count).  Mutable cons cells, bumped in place;
 ;; reset (rebound to '()) by reset-counters! so no run leaks into a later one.
@@ -921,24 +939,50 @@
   (or (not (eq? entry-M (subst-map (state-S st))))
       (not (eq? entry-C (state-C st)))))
 
+;; One counted evaluation step: run `g` (an (st) -> inf/d) on `st`, bump the
+;; label's counters per the outcome, and re-wrap any suspension thunk so the
+;; NEXT step (a re-fire from a conj/d-run worklist or the state-F resume) is
+;; counted under the same label.
+(define (tally-step label g st)
+  (let ([entry-M (subst-map (state-S st))]
+        [entry-C (state-C st)])
+    (let ([result (g st)])
+      (case-inf/d result
+        [()
+         (begin
+           (view-tally-bump! label 'refute)
+           #f)]
+        [(c^)
+         (begin
+           (when (view-store-changed? c^ entry-M entry-C)
+             (view-tally-bump! label 'force))
+           c^)]
+        [(c f)
+         (begin
+           (when (view-store-changed? c entry-M entry-C)
+             (view-tally-bump! label 'force))
+           (cons c (tally-wrap-resume label f)))]
+        [(ch fh)
+         (begin
+           (when (view-store-changed? ch entry-M entry-C)
+             (view-tally-bump! label 'force))
+           (make-hard-suspended ch (tally-wrap-resume label fh)))]))))
+
+;; Wrap a resume thunk ((suspend-depth) -> (st) -> inf/d, the shape of both
+;; soft and hard worklist items) so its next step is a counted tally-step.
+(define (tally-wrap-resume label f)
+  (lambda (suspend-depth)
+    (let ([g (f suspend-depth)])
+      (lambda (st)
+        (tally-step label g st)))))
+
 (define (tally/d label goal)
   (lambda (unsound-fail-depth)
     (let ([g1 (goal unsound-fail-depth)])
       (lambda (suspend-depth)
         (let ([g2 (g1 suspend-depth)])
           (lambda (st)
-            (let ([entry-M (subst-map (state-S st))]
-                  [entry-C (state-C st)])
-              (let ([result (g2 st)])
-                (case-inf/d result
-                  [() (view-tally-bump! label 'refute)]
-                  [(c^) (when (view-store-changed? c^ entry-M entry-C)
-                          (view-tally-bump! label 'force))]
-                  [(c f) (when (view-store-changed? c entry-M entry-C)
-                           (view-tally-bump! label 'force))]
-                  [(ch fh) (when (view-store-changed? ch entry-M entry-C)
-                             (view-tally-bump! label 'force))])
-                result))))))))
+            (tally-step label g2 st)))))))
 
 ;; Print the per-view tally (nothing when empty, so non-tallied runs are
 ;; unaffected).  Called from the `run` macro's report path, alongside

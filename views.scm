@@ -13,6 +13,22 @@
 ;;   R2  decreasing-recursiono/d  refutes self-calls with no single fixed
 ;;                                structurally-decreasing argument position
 ;;                                (non-terminating recursion)
+;;   R2P permuted-decreasing-     INCOMPARABLE companion to R2 (not a superset):
+;;       recursiono/d             refutes self-calls that admit no INJECTIVE
+;;                                assignment of args to distinct params with
+;;                                each arg <= its param and one strict.  Accepts
+;;                                argument-permuting recursions R2 refutes
+;;                                (interleave) but refutes growing-accumulator
+;;                                recursions R2 accepts (rev-acc).  Per-site
+;;                                assignment.  See its section for soundness.
+;;   R2T terminating-recursiono/d the PRODUCTION termination view: whole-body
+;;                                disjunction R2 OR R2P.  Accepts iff the body
+;;                                terminates by the fixed-position measure OR by
+;;                                the injective-multiset measure -- each
+;;                                disjunct checked over ALL call sites, never
+;;                                mixed per-site.  Covers rev-acc (via R2) AND
+;;                                interleave (via R2P).  Refutes only when BOTH
+;;                                refute.
 ;;   TY  type-ofo/d               refutes bodies ill-typed under the task's
 ;;                                declared types
 ;;   NV  non-vacuous-testso/d     refutes (if (= X X) ...) with syntactically
@@ -585,6 +601,619 @@
       (decreasing-recursiono/d 'rember '(e l)
         '(match l ['() l] [(cons a d) (rember d e)]))))
   '())
+
+;; === R2P: permuted-decreasing-recursiono/d --- a GENERALIZED termination view.
+;;
+;; R2 (`decreasing-recursiono/d`) demands ONE FIXED argument position that
+;; structurally decreases in EVERY self-call.  That is sound but too weak for
+;; argument-PERMUTING recursions: interleave's canonical body
+;;   (match l1 ['() l2] [(cons a d) (cons a (interleave l2 d))])
+;; swaps its arguments in the self-call -- position 1 gets l2 (parameter 2, not
+;; a descendant of l1) and position 2 gets d (a descendant of l1, but at the l2
+;; slot).  No fixed position decreases, so R2 refutes it, and dropping R2
+;; leaves interleave infeasible (see claude/2026-07-12-214500 finding 4).
+;;
+;;   (permuted-decreasing-recursiono/d fname params body)
+;;     succeeds  iff  EVERY self-call's arguments admit an INJECTIVE assignment
+;;                    to DISTINCT formal parameters (a permutation when arities
+;;                    match) such that each argument is equal-to-or-a-structural-
+;;                    descendant-of its assigned parameter, and AT LEAST ONE
+;;                    argument is a PROPER (strict) descendant.  The assignment
+;;                    may differ per call site.
+;;     fails     iff  some self-call admits no such assignment
+;;     stalls         while the term is too holey to decide either way
+;;
+;; --- soundness argument ---
+;;
+;;  Consider the multiset (equivalently, the plain sum) of the CURRENT sizes of
+;;  the actual arguments at a self-call.  Under an injective assignment sigma
+;;  with each arg a_k satisfying  |a_k| <= |p_{sigma(k)}|  (arg is equal-to-or-a-
+;;  descendant-of its assigned parameter) and at least one k strict
+;;  (|a_k| < |p_{sigma(k)}|), the sum of the argument sizes at the call is
+;;  STRICTLY LESS than the sum of the formal parameters' current sizes: sigma
+;;  injective means each source parameter is charged at most once, so the
+;;  arguments' sizes are bounded by a sub-selection of DISTINCT parameter sizes,
+;;  hence  sum_k |a_k| <= sum_k |p_{sigma(k)}| <= sum_j |p_j|, with the first
+;;  inequality strict by the one strict k.  So the summed parameter size
+;;  strictly decreases at every self-call.  It is a natural number (sizes are
+;;  finite on finite inputs), so it cannot decrease forever: recursion
+;;  terminates.  Per-site assignments COMPOSE because the measure -- the sum
+;;  over arguments -- is evaluated per call and does not depend on which
+;;  permutation was used at any other call.
+;;
+;;  INJECTIVITY IS REQUIRED.  Without it, two arguments could both be charged to
+;;  the same large parameter (e.g. (f d d) where d descends from p1 only): the
+;;  per-position check "slot 1 decreases" holds, yet the multiset sum can GROW,
+;;  and the recursion can diverge.  So R2P REFUTES (f d d) -- distinct sources
+;;  for distinct args -- even though R2's fixed-position check accepts it (R2
+;;  only inspects one slot and ignores the collision at the other).
+;;
+;; --- implementation (mirrors R2's machinery) ---
+;;
+;;  R2 threads (slot, sames, smallers) relative to ONE parameter.  R2P threads
+;;  `psets`: a Scheme list, one entry per parameter, each entry a pair
+;;  (sames_j . smallers_j) of mk-terms classified relative to p_j.  Initially
+;;  sames_j = (p_j), smallers_j = ().  At a match (match e ['() e1] [(cons x y)
+;;  e2]) whose scrutinee e is a bare variable classified under some family j
+;;  (e in sames_j U smallers_j), the pattern vars x,y join smallers_j within e2
+;;  (they are proper descendants of p_j); e is classified under at most one
+;;  family, so at most one family is extended.  A self-call is checked by an
+;;  INNER conde/d over injective assignments (arity 1: identity; arity 2:
+;;  identity and swap), each clause's guard being the whole "all args <= their
+;;  param, one strict" check; both live -> stall, one live -> commit, none ->
+;;  refute.  Arity > 2 is a documented error (arity <= 2 covers the whole suite).
+;;
+;;  Holes stall, for-ALL distributes as conjunction, no-shadowing of fname and
+;;  every classified name, non-fname operators recursed-into-operands-only --
+;;  all exactly as R2.  Types are NOT modelled (same as R2): left for TY/EX.
+
+;; family_j's classified set = sames_j U smallers_j (the "<=" set for p_j).
+(define (family-union pset) (append (car pset) (cdr pset)))
+
+;; every classified name across all families (for no-shadowing).
+(define (all-classified psets) (apply append (map family-union psets)))
+
+;; is `a` a bare var equal-to-or-descended-from param p (<=)?  Reuses R2's
+;; arg-decreasing/d (bare-var membership) against the family's whole <= set.
+(define (arg-le/d a pset)
+  (arg-decreasing/d a (family-union pset)))
+
+;; is `a` a bare var that is a PROPER descendant of p (strict)?  Membership in
+;; smallers only.
+(define (arg-strict/d a pset)
+  (arg-decreasing/d a (cdr pset)))
+
+;; is `a` a bare var EQUAL to p (same-size, not strict)?  Membership in sames.
+(define (arg-same/d a pset)
+  (arg-decreasing/d a (car pset)))
+
+;; a pair of args assigned to a pair of params: aA <= pA, aB <= pB, and at
+;; least one strict.  The two clause guards -- "aA strict" vs "aA same" -- are
+;; MUTUALLY EXCLUSIVE (sames_A and smallers_A are disjoint: a var is p_A or a
+;; proper descendant of p_A, never both), so for a ground call exactly one
+;; commits (or neither -> refute; holey -> stall):
+;;   aA strict -> aB need only be <=            (one strict already found)
+;;   aA same   -> aB MUST be strict             (else nothing decreases)
+(define (assign-pair/d aA psetA aB psetB)
+  (conde/d
+    ([]
+     [(arg-strict/d aA psetA)]
+     [(arg-le/d aB psetB)])
+    ([]
+     [(arg-same/d aA psetA)]
+     [(arg-strict/d aB psetB)])))
+
+;; the assignment check at a self-call: args (a Scheme list of mk-terms) vs
+;; psets (a Scheme list of families), same length.  arity 1: forced identity,
+;; the single arg must be strict.  arity 2: an OUTER conde/d over the two
+;; injective assignments (identity, swap); both live -> stall, one -> commit,
+;; none -> refute.  arity > 2: documented error.
+(define (assignment-check/d args psets)
+  (let ([n (length psets)])
+    (cond
+      [(= n 1)
+       (arg-strict/d (car args) (car psets))]
+      [(= n 2)
+       (let ([a1 (car args)]
+             [a2 (cadr args)]
+             [p1 (car psets)]
+             [p2 (cadr psets)])
+         (conde/d
+           ([] ; identity: a1<-p1, a2<-p2
+            [(assign-pair/d a1 p1 a2 p2)]
+            [])
+           ([] ; swap: a1<-p2, a2<-p1
+            [(assign-pair/d a1 p2 a2 p1)]
+            [])))]
+      [else
+       (error 'permuted-decreasing-recursiono/d
+         "arity > 2 not supported" n)])))
+
+;; destructure `rands` (a possibly-holey mk-list) into EXACTLY n args, then
+;; call the Scheme continuation `k` (args-as-Scheme-list -> goal).  Stall-safe:
+;; a holey `rands` leaves the '()-clause and the pair-clause both live -> stall
+;; (never over-commits a hole).  Too few / too many args -> refute (a self-call
+;; of the wrong arity cannot be the well-formed recursive call).
+(define (destructure-rands/d rands n k)
+  (if (= n 0)
+      (conde/d
+        ([]
+         [(==/d '() rands)]
+         [(k '())])
+        ([a d]
+         [(==/d `(,a . ,d) rands)]
+         [fail/d-goal])) ; extra args
+      (conde/d
+        ([]
+         [(==/d '() rands)]
+         [fail/d-goal]) ; too few args
+        ([a d]
+         [(==/d `(,a . ,d) rands)]
+         [(destructure-rands/d d (- n 1)
+            (lambda (rest) (k (cons a rest))))]))))
+
+;; a self-call (fname . rands): its args must admit a valid injective assignment.
+(define (self-call-perm/d rands psets)
+  (destructure-rands/d rands (length psets)
+    (lambda (args) (assignment-check/d args psets))))
+
+;; classify a match's cons-branch pattern vars under the RIGHT family, then
+;; check e2.  `e` is known to be a symbol here.  If e belongs to family j
+;; (e in family_j's <= set), x,y join smallers_j; if e belongs to no family,
+;; no extension.  The membership guards are mutually exclusive (e is in at most
+;; one family), so a ground e commits exactly one clause; a still-unbound symbol
+;; var makes the membership tests stall.  arity <= 2 written out explicitly.
+(define (sym-scrutinee-perm/d fname e x y e2 psets)
+  (let ([n (length psets)])
+    (cond
+      [(= n 1)
+       (let* ([p0 (car psets)]
+              [u0 (family-union p0)]
+              [ext0 (list (cons (car p0) (cons x (cons y (cdr p0)))))])
+         (conde/d
+           ([]
+            [(member-of/d e u0)]
+            [(all-decreasing-perm/d fname e2 ext0)])
+           ([]
+            [(not-member-of/d e u0)]
+            [(all-decreasing-perm/d fname e2 psets)])))]
+      [(= n 2)
+       (let* ([p0 (car psets)]
+              [p1 (cadr psets)]
+              [u0 (family-union p0)]
+              [u1 (family-union p1)]
+              [ext0 (list (cons (car p0) (cons x (cons y (cdr p0)))) p1)]
+              [ext1 (list p0 (cons (car p1) (cons x (cons y (cdr p1)))))])
+         (conde/d
+           ([]
+            [(member-of/d e u0)]
+            [(all-decreasing-perm/d fname e2 ext0)])
+           ([]
+            [(member-of/d e u1)]
+            [(all-decreasing-perm/d fname e2 ext1)])
+           ([]
+            [(fresh/d ()
+               (not-member-of/d e u0)
+               (not-member-of/d e u1))]
+            [(all-decreasing-perm/d fname e2 psets)])))]
+      [else
+       (error 'permuted-decreasing-recursiono/d
+         "arity > 2 not supported" n)])))
+
+;; discriminate on a match scrutinee's shape; a hole -> stall.  Only a bare
+;; classified variable extends the environment (via sym-scrutinee-perm/d).
+(define (match-branch-perm/d fname e x y e2 psets)
+  (conde/d
+    ([]
+     [(symbolo/d e)]
+     [(sym-scrutinee-perm/d fname e x y e2 psets)])
+    ([]
+     [(numbero/d e)]
+     [(all-decreasing-perm/d fname e2 psets)])
+    ([]
+     [(==/d '(quote ()) e)]
+     [(all-decreasing-perm/d fname e2 psets)])
+    ([a b]
+     [(==/d `(cons ,a ,b) e)]
+     [(all-decreasing-perm/d fname e2 psets)])
+    ([a b c dd]
+     [(==/d `(if (= ,a ,b) ,c ,dd) e)]
+     [(all-decreasing-perm/d fname e2 psets)])
+    ([ee f1 xx yy f2]
+     [(==/d `(match ,ee ['() ,f1] [(cons ,xx ,yy) ,f2]) e)]
+     [(all-decreasing-perm/d fname e2 psets)])
+    ([rator rands]
+     [(==/d `(,rator . ,rands) e)
+      (symbolo/d rator)
+      (absento/d rator view-app-keywords)]
+     [(all-decreasing-perm/d fname e2 psets)])))
+
+;; every operand of an application must itself satisfy all-decreasing (nested
+;; self-calls can hide inside operands).  AND over the operand list.
+(define (rands-all-perm/d fname rands psets)
+  (conde/d
+    ([]
+     [(==/d '() rands)]
+     [])
+    ([a d]
+     [(==/d `(,a . ,d) rands)]
+     [(all-decreasing-perm/d fname a psets)
+      (rands-all-perm/d fname d psets)])))
+
+;; the core walk: EVERY self-call in `body` is permuted-decreasing, given the
+;; per-parameter environment `psets`.  Conjunction over subterms throughout
+;; (for-ALL over self-calls, so no path-OR).  Mirrors R2's all-decreasing-at/d.
+(define (all-decreasing-perm/d fname body psets)
+  (conde/d
+    ;; number literal -- no self-call
+    ([]
+     [(numbero/d body)]
+     [])
+    ;; variable reference -- no self-call
+    ([]
+     [(symbolo/d body)]
+     [])
+    ;; '() literal
+    ([]
+     [(==/d '(quote ()) body)]
+     [])
+    ;; (cons e1 e2): both operands (AND)
+    ([e1 e2]
+     [(==/d `(cons ,e1 ,e2) body)]
+     [(all-decreasing-perm/d fname e1 psets)
+      (all-decreasing-perm/d fname e2 psets)])
+    ;; (if (= e1 e2) e3 e4): all four subterms (AND)
+    ([e1 e2 e3 e4]
+     [(==/d `(if (= ,e1 ,e2) ,e3 ,e4) body)]
+     [(all-decreasing-perm/d fname e1 psets)
+      (all-decreasing-perm/d fname e2 psets)
+      (all-decreasing-perm/d fname e3 psets)
+      (all-decreasing-perm/d fname e4 psets)])
+    ;; (match e ['() e1] [(cons x y) e2]): scrutinee AND nil-branch AND cons-
+    ;; branch (with possibly-extended env).  No-shadowing of fname and of every
+    ;; classified name.
+    ([e e1 x y e2]
+     [(==/d `(match ,e ['() ,e1] [(cons ,x ,y) ,e2]) body)
+      (symbolo/d x)
+      (symbolo/d y)
+      (no-shadow/d (list x y) (cons fname (all-classified psets)))]
+     [(all-decreasing-perm/d fname e psets)
+      (all-decreasing-perm/d fname e1 psets)
+      (match-branch-perm/d fname e x y e2 psets)])
+    ;; self-application (fname . rands): args must admit a valid injective
+    ;; assignment, AND the operands themselves must be all-decreasing.
+    ([rands]
+     [(==/d `(,fname . ,rands) body)]
+     [(self-call-perm/d rands psets)
+      (rands-all-perm/d fname rands psets)])
+    ;; other application (rator . rands), rator =/= fname: recurse into operands.
+    ([rator rands]
+     [(==/d `(,rator . ,rands) body)
+      (symbolo/d rator)
+      (=/=/d rator fname)
+      (absento/d rator view-app-keywords)]
+     [(rands-all-perm/d fname rands psets)])))
+
+;; the public relation.  Initialize psets: each parameter p_j starts in its own
+;; sames_j = (p_j), smallers_j = ().  arity > 2 -> documented error.
+(define (permuted-decreasing-recursiono/d fname params body)
+  (if (> (length params) 2)
+      (error 'permuted-decreasing-recursiono/d
+        "arity > 2 not supported" (length params))
+      (all-decreasing-perm/d fname body
+        (map (lambda (p) (cons (list p) '())) params))))
+
+;;; ------------------------------------------------------------------
+;;; Validation gates.  Run when this file is loaded (./run.sh loads it).
+;;; ------------------------------------------------------------------
+
+;; ACCEPT (succeed or stall -- q left unbound -> '(_.0)).
+
+;; THE HEADLINE: interleave's argument-SWAPPING canonical body, which R2
+;; refutes, is ACCEPTED by R2P via the swap assignment (l2<-l2 same, d<-l1
+;; strict).
+(test "permuted-decreasing-recursiono/d: interleave (arg-swap) ACCEPTED"
+  (run 1 (q)
+    (follower q
+      (permuted-decreasing-recursiono/d 'interleave '(l1 l2)
+        '(match l1 ['() l2] [(cons a d) (cons a (interleave l2 d))]))))
+  '(_.0))
+
+;; canonical rember (identity, position-2 strict) still accepted.
+(test "permuted-decreasing-recursiono/d: canonical rember accepted"
+  (run 1 (q)
+    (follower q
+      (permuted-decreasing-recursiono/d 'rember '(e l)
+        '(match l ['() l] [(cons a d) (if (= a e) d (cons a (rember e d)))]))))
+  '(_.0))
+
+;; canonical append (identity, position-1 strict) still accepted.
+(test "permuted-decreasing-recursiono/d: canonical append accepted"
+  (run 1 (q)
+    (follower q
+      (permuted-decreasing-recursiono/d 'append '(l s)
+        '(match l ['() s] [(cons a d) (cons a (append d s))]))))
+  '(_.0))
+
+;; STALL on holes: leaves the holes unbound, does not refute or over-commit.
+(test "permuted-decreasing-recursiono/d: holey match stalls, holes unbound"
+  (run 1 (h1 h2)
+    (follower (list h1 h2)
+      (permuted-decreasing-recursiono/d 'rember '(e l)
+        `(match l ['() ,h1] [(cons a d) ,h2]))))
+  '((_.0 _.1)))
+
+;; STALL on a self-call whose argument is a bare hole (cannot classify yet).
+(test "permuted-decreasing-recursiono/d: self-call with holey arg stalls"
+  (run 1 (h)
+    (follower h
+      (permuted-decreasing-recursiono/d 'rember '(e l)
+        `(match l ['() l] [(cons a d) (rember e ,h)]))))
+  '(_.0))
+
+;; bare hole stalls (undetermined) -> q unbound.
+(test "permuted-decreasing-recursiono/d: bare hole stalls"
+  (run 1 (q)
+    (follower q (permuted-decreasing-recursiono/d 'rember '(e l) q)))
+  '(_.0))
+
+;; REFUTE (ground, no valid injective assignment -> '()).
+
+;; identity self-call with NOTHING strict: (rember e l) recurs on l itself.
+(test "permuted-decreasing-recursiono/d: (rember e l) refuted (no strict)"
+  (run 1 (q)
+    (follower q
+      (permuted-decreasing-recursiono/d 'rember '(e l)
+        '(match l ['() l] [(cons a d) (rember e l)]))))
+  '())
+
+;; ASCENDING self-call: (rember e (cons a l)) -- arg is a cons EXPRESSION, not a
+;; bare descendant var, at every position -> refute.
+(test "permuted-decreasing-recursiono/d: (rember e (cons a l)) refuted (ascending)"
+  (run 1 (q)
+    (follower q
+      (permuted-decreasing-recursiono/d 'rember '(e l)
+        '(match l ['() l] [(cons a d) (rember e (cons a l))]))))
+  '())
+
+;; NON-INJECTIVE: (interleave d d) -- both args descend from l1 only, so no
+;; injective assignment to distinct params exists -> REFUTE (violates
+;; injectivity), even though slot 1 alone decreases (which is what R2 accepts).
+(test "permuted-decreasing-recursiono/d: (interleave d d) refuted (non-injective)"
+  (run 1 (q)
+    (follower q
+      (permuted-decreasing-recursiono/d 'interleave '(l1 l2)
+        '(match l1 ['() l2] [(cons a d) (interleave d d)]))))
+  '())
+
+;; CURIOSITY (recorded, not a soundness gate): plain R2 ACCEPTS (interleave d d)
+;; because it inspects only ONE fixed slot (slot 1, where d IS smaller) and
+;; ignores the collision at slot 2.  R2P refutes it (test above).  This makes
+;; the fixed-position-vs-injective difference concrete.
+(test "decreasing-recursiono/d: (interleave d d) ACCEPTED by R2 (fixed-position)"
+  (run 1 (q)
+    (follower q
+      (decreasing-recursiono/d 'interleave '(l1 l2)
+        '(match l1 ['() l2] [(cons a d) (interleave d d)]))))
+  '(_.0))
+
+;; === R2T: terminating-recursiono/d --- the PRODUCTION termination view:
+;; whole-body disjunction R2 OR R2P.
+;;
+;; R2 and R2P are INCOMPARABLE (see the R2P section and gates): R2 accepts
+;; rev-acc's growing-accumulator recursion (fixed position l decreases; the
+;; accumulator argument is simply ignored) but refutes interleave's
+;; argument-swap; R2P accepts interleave (injective multiset measure) but
+;; refutes rev-acc (the accumulator arg (cons a acc) is LARGER than acc, so the
+;; summed measure cannot decrease).  The production view is their disjunction.
+;;
+;;   (terminating-recursiono/d fname params body)
+;;     succeeds  iff  the FULL R2 check succeeds on `body` OR the FULL R2P
+;;                    check succeeds on `body`
+;;     fails     iff  BOTH refute
+;;     stalls         otherwise (no disjunct has succeeded and at least one is
+;;                    still undetermined)
+;;
+;; --- soundness ---
+;;
+;;  Each disjunct is a COMPLETE well-founded measure checked over ALL self-call
+;;  sites of the body: R2 = "some fixed argument position strictly decreases at
+;;  every self-call"; R2P = "at every self-call the injective-assignment
+;;  multiset sum strictly decreases".  The disjunction just says "the function
+;;  terminates by the fixed-position measure or by the injective-multiset
+;;  measure" -- both well-founded, so either alone implies termination.
+;;  PER-SITE MIXING of the two measures would be UNSOUND (the classic
+;;  measure-alternation trap: one call decreases measure A while growing B, the
+;;  next decreases B while growing A, and neither ever bottoms out).  This
+;;  relation never mixes: it is all-sites-R2 OR all-sites-R2P, each disjunct
+;;  evaluated over the whole body.
+;;
+;; --- concluding-oro/d: OR of two pure /d CHECKS that can conclude success ---
+;;
+;; Why not the existing `oro/d` (experiments/negative-view-branch-vacuity.scm),
+;; the two-clause conde/d with the disjuncts as guards?  Evaluated against the
+;; truth table this view needs:
+;;
+;;   g1 refutes + g2 stalls  -> oro/d: one live clause -> commit-with-resume
+;;                              -> STALL         (correct: must not refute)
+;;   both refute             -> oro/d: REFUTE    (correct)
+;;   g1 stalls + g2 succeeds -> oro/d: two live guards -> nondeterministic ->
+;;                              STALL             (WRONG: the disjunction is
+;;                              definitively true; should SUCCEED)
+;;   both succeed            -> oro/d: STALL, permanently -- semantically fine
+;;                              for a check but the goal re-fires at every
+;;                              trigger forever, and for R2T both-accept is the
+;;                              COMMON case (most surviving bodies satisfy both
+;;                              measures)
+;;
+;; oro/d is committed-choice (guards must be mutually exclusive to conclude);
+;; a disjunction of overlapping checks needs different success semantics, so
+;; we build concluding-oro/d directly on the inf/d representation.  It
+;; evaluates BOTH disjuncts against the entry state and combines outcomes
+;; (S = singleton success, T = soft-suspended, H = hard-suspended, R = refuted):
+;;
+;;   r1 = R              -> return g2's stream UNCHANGED  (disjunction = g2)
+;;   r2 = R              -> return r1 UNCHANGED           (disjunction = g1)
+;;   any S (both live)   -> succeed with the ENTRY state  (conclude, no
+;;                          extensions leak)
+;;   any T (both live)   -> soft-stall; retry the whole disjunction
+;;   else (H/H)          -> hard-stall; retry the whole disjunction
+;;
+;; EXTENSIONS: a disjunct's store extensions (bindings, =/=, symbolo, ...)
+;; reach the outer state ONLY in the two collapse rows, where the other
+;; disjunct has DEFINITIVELY refuted and the survivor is therefore forced --
+;; its stream (partial extensions, resume thunk and all) is returned
+;; unchanged, which is exactly conde/d's one-live-clause commit discipline.
+;; /d refutation is definitive under state extension (the basis of follower
+;; refutation soundness), so the collapse is permanent and sound.  In every
+;; other success row the disjunction is true but WHICH disjunct holds is not
+;; forced, so no extension is forced: we return the entry state and conclude.
+;; (Discarding a pure check's extensions is always sound -- it only forgoes
+;; pruning.)  The disjuncts here are pure checks, so nothing of value is
+;; discarded.
+
+;; classify an inf/d result (see case-inf/d in following.scm).
+(define (inf/d-kind r)
+  (case-inf/d r
+    [() 'refute]
+    [(c) 'success]
+    [(c f) 'soft]
+    [(ch fh) 'hard]))
+
+(define (concluding-oro/d g1 g2)
+  (lambda (unsound-fail-depth)
+    (letrec ([or-g
+              (lambda (suspend-depth)
+                (lambda (st)
+                  (let ([r1 (((g1 unsound-fail-depth) suspend-depth) st)])
+                    (if (not r1)
+                        ;; g1 definitively refuted: the disjunction IS g2.
+                        (((g2 unsound-fail-depth) suspend-depth) st)
+                        (let ([r2 (((g2 unsound-fail-depth) suspend-depth) st)])
+                          (if (not r2)
+                              ;; g2 definitively refuted: the disjunction IS g1.
+                              r1
+                              (let ([k1 (inf/d-kind r1)]
+                                    [k2 (inf/d-kind r2)])
+                                (cond
+                                  ;; some disjunct definitively true -> conclude;
+                                  ;; entry state (no extension is forced).
+                                  [(or (eq? k1 'success) (eq? k2 'success))
+                                   st]
+                                  ;; some disjunct soft-suspended -> soft-stall,
+                                  ;; retry the whole disjunction.
+                                  [(or (eq? k1 'soft) (eq? k2 'soft))
+                                   (cons st or-g)]
+                                  ;; both hard-suspended -> defer to retrigger.
+                                  [else (make-hard-suspended st or-g)]))))))))])
+      or-g)))
+
+;; the public relation: R2 OR R2P, whole-body each.
+(define (terminating-recursiono/d fname params body)
+  (concluding-oro/d
+    (decreasing-recursiono/d fname params body)
+    (permuted-decreasing-recursiono/d fname params body)))
+
+;;; ------------------------------------------------------------------
+;;; Validation gates.  Run when this file is loaded (./run.sh loads it).
+;;; ------------------------------------------------------------------
+
+;; ACCEPT: the two halves of the R2/R2P incomparability, both now accepted.
+
+;; rev-acc: R2 accepts (fixed position l), R2P refutes (growing accumulator).
+(test "terminating-recursiono/d: rev-acc accepted (via R2 disjunct)"
+  (run 1 (q)
+    (follower q
+      (terminating-recursiono/d 'rev '(l acc)
+        '(match l ['() acc] [(cons a d) (rev d (cons a acc))]))))
+  '(_.0))
+
+;; interleave: R2 refutes (argument swap), R2P accepts (swap assignment).
+(test "terminating-recursiono/d: interleave accepted (via R2P disjunct)"
+  (run 1 (q)
+    (follower q
+      (terminating-recursiono/d 'interleave '(l1 l2)
+        '(match l1 ['() l2] [(cons a d) (cons a (interleave l2 d))]))))
+  '(_.0))
+
+;; canonical rember: BOTH disjuncts accept -> the disjunction concludes
+;; success (this is the row where oro/d would have stalled forever).
+(test "terminating-recursiono/d: canonical rember accepted (both disjuncts)"
+  (run 1 (q)
+    (follower q
+      (terminating-recursiono/d 'rember '(e l)
+        '(match l ['() l] [(cons a d) (if (= a e) d (cons a (rember e d)))]))))
+  '(_.0))
+
+;; (interleave d d): R2P refutes (non-injective) but R2 accepts (slot 1
+;; decreases in every call -- a sound fixed-position measure; the body DOES
+;; terminate), so the disjunction ACCEPTS.
+(test "terminating-recursiono/d: (interleave d d) accepted (via R2 disjunct)"
+  (run 1 (q)
+    (follower q
+      (terminating-recursiono/d 'interleave '(l1 l2)
+        '(match l1 ['() l2] [(cons a d) (interleave d d)]))))
+  '(_.0))
+
+;; (rember d e): R2 refutes (argument swap) but R2P accepts (swap assignment
+;; d<-l strict, e<-e same), so the disjunction ACCEPTS.
+(test "terminating-recursiono/d: (rember d e) accepted (via R2P disjunct)"
+  (run 1 (q)
+    (follower q
+      (terminating-recursiono/d 'rember '(e l)
+        '(match l ['() l] [(cons a d) (rember d e)]))))
+  '(_.0))
+
+;; REFUTE: only when BOTH measures reject.
+
+(test "terminating-recursiono/d: (rember e l) refuted (both measures reject)"
+  (run 1 (q)
+    (follower q
+      (terminating-recursiono/d 'rember '(e l)
+        '(match l ['() l] [(cons a d) (rember e l)]))))
+  '())
+
+(test "terminating-recursiono/d: (rember e (cons a l)) refuted (both reject)"
+  (run 1 (q)
+    (follower q
+      (terminating-recursiono/d 'rember '(e l)
+        '(match l ['() l] [(cons a d) (rember e (cons a l))]))))
+  '())
+
+;; STALL: one disjunct refutes, the other stalls -> must STALL, not refute.
+
+;; R2 refutes this whole body outright (both slots fail at the ground
+;; self-call (rember d e), and a refuted conjunct dominates the stalled hole);
+;; R2P stalls (self-call fine via swap; the nil-branch hole is undecided).
+(test "terminating-recursiono/d: R2-refutes/R2P-stalls -> stalls, hole unbound"
+  (run 1 (h)
+    (follower h
+      (terminating-recursiono/d 'rember '(e l)
+        `(match l ['() ,h] [(cons a d) (rember d e)]))))
+  '(_.0))
+
+;; mirror image: R2P refutes this body outright ((interleave d d) is
+;; non-injective, refuted conjunct dominates); R2 stalls (slot 1 fine, the
+;; nil-branch hole is undecided).
+(test "terminating-recursiono/d: R2P-refutes/R2-stalls -> stalls, hole unbound"
+  (run 1 (h)
+    (follower h
+      (terminating-recursiono/d 'interleave '(l1 l2)
+        `(match l1 ['() ,h] [(cons a d) (interleave d d)]))))
+  '(_.0))
+
+;; STALL on plain holes, holes left unbound.
+(test "terminating-recursiono/d: holey match stalls, holes unbound"
+  (run 1 (h1 h2)
+    (follower (list h1 h2)
+      (terminating-recursiono/d 'rember '(e l)
+        `(match l ['() ,h1] [(cons a d) ,h2]))))
+  '((_.0 _.1)))
+
+(test "terminating-recursiono/d: bare hole stalls"
+  (run 1 (q)
+    (follower q (terminating-recursiono/d 'rember '(e l) q)))
+  '(_.0))
 
 ;; === TY: type-ofo/d --- rung 3 / third follower view: a /d TYPE checker
 ;; for the restricted language, composed into a follower alongside rungs 1 & 2.
