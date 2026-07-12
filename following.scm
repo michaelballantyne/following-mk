@@ -225,7 +225,8 @@
   (set! *externally-productive-trigger-counter* 0)
   (set! *externally-unproductive-trigger-counter* 0)
   (set! *user-counter* 0)
-  (reset-depth-tally!))
+  (reset-depth-tally!)
+  (reset-view-tallies!))
 
 (define counter-descriptors
   (list (cons "unify (main)"
@@ -381,6 +382,7 @@
                                      empty-state)))])
          (print-parameters!)
          (print-counters!)
+         (print-view-tallies)
          result))]
     [(_ n (q0 q1 q ...) g0 g ...)
      (run n (x)
@@ -835,3 +837,118 @@
     (if (equal? before-reified after-reified)
         (increment-counter! *externally-unproductive-trigger-counter*)
         (increment-counter! *externally-productive-trigger-counter*))))
+
+;;; --- per-view attribution tally (tally/d)
+;;;
+;;; (tally/d label goal) wraps a /d goal TRANSPARENTLY -- identical search
+;;; behavior; it evaluates the wrapped goal exactly once per invocation and
+;;; returns its inf/d result unchanged -- while attributing two per-label
+;;; events to `label` (a symbol such as 'R1, 'TY, 'EX):
+;;;
+;;;   refute -- the wrapped goal's /d evaluation FAILS on this invocation
+;;;             (returns #f), which fails the follower conjunction on this
+;;;             branch.
+;;;   force  -- the wrapped goal COMMITS a store change: the committed result
+;;;             state's substitution map OR constraint store is not eq? to the
+;;;             entry state's, i.e. a binding or a constraint was added.
+;;;
+;;; The force test is exactly conj/d-run's `changed?` fixpoint test: an
+;;; identity comparison on (subst-map (state-S st)) and (state-C st).  It is
+;;; CHEAP and UNIFY-FREE (only car/cdr accessors, no walk, no reify), so
+;;; tally/d needs no `without-unify-counting` guard and adds near-zero
+;;; unify(main)/unify(follower) -- contrast the reify-based productivity tally,
+;;; whose reify IS a hidden unify consumer.  Verified: bound-15
+;;; rember-full-id-views is byte-identical (unify-main / conde-main) with all
+;;; five views tally-wrapped vs untallied.
+;;;
+;;; Event counted for each of the four inf/d outcomes of the wrapped goal:
+;;;   #f (fail)         -> refute++            (return value: #f, unchanged)
+;;;   state (singleton) -> force++ iff store changed vs entry
+;;;   (state . thunk)   -> force++ iff store changed vs entry
+;;;   hard-suspended    -> force++ iff store changed vs entry
+;;; A STALL returns the ENTRY state unchanged -- conde/d's `nondeterministic`
+;;; yields (cons st thunk) with the same st, and a suspend-depth cutoff yields
+;;; (make-hard-suspended st ...) with the same st -- so its store is eq? to
+;;; entry and NEITHER counter moves.  That is the intended three-way split:
+;;; refute / force / (stall = neither).
+;;;
+;;; KNOWN BLIND SPOTS (consequences of the cheap store-identity choice):
+;;;   1. INTERNAL FRESH-VAR BINDINGS COUNT AS FORCE.  The set-var-val!
+;;;      optimization is disabled in mk.scm (subst-add always builds a fresh
+;;;      subst-map), so a view that merely ACCEPTS already-committed structure
+;;;      -- e.g. matching (==/d `(cons ,e1 ,e2) body) against a committed cons,
+;;;      binding the view's own fresh pattern vars e1,e2 -- changes subst-map
+;;;      identity and scores a "force" even though it did not narrow the outer
+;;;      term q.  So `force` means "committed and extended the store somehow",
+;;;      which over-counts relative to "forced a hole in q".  The reify-based
+;;;      aggregate *externally-productive-trigger-counter* is the term-level
+;;;      metric that excludes these; tally/d is the cheap per-view metric that
+;;;      does not.
+;;;   2. PER-INVOCATION, NOT PER-DISTINCT-DECISION.  A view that stalls can be
+;;;      re-evaluated at later triggers and within conj/d-run's fixpoint
+;;;      iterations; each re-evaluation is counted afresh.  Counts are
+;;;      evaluation frequencies, not counts of distinct candidate outcomes.
+;;;   3. SURVIVAL IS LOCAL.  A commit counted here may later be discarded by a
+;;;      subsequent conjunct in the follower failing.  "in a commit that
+;;;      survives" is therefore approximate: it survives the wrapped goal, not
+;;;      necessarily the whole follower branch.
+
+;; label -> (refute-count . force-count).  Mutable cons cells, bumped in place;
+;; reset (rebound to '()) by reset-counters! so no run leaks into a later one.
+;; Exposed so a harness can snapshot per level (as id-harness snapshots the
+;; counter globals) before the next run's reset.
+(define *view-tally-alist* '())
+
+(define (view-tally-ref label)
+  (let ([e (assq label *view-tally-alist*)])
+    (if e (cdr e) (cons 0 0))))
+
+(define (reset-view-tallies!)
+  (set! *view-tally-alist* '()))
+
+(define (view-tally-bump! label which)
+  (let ([e (assq label *view-tally-alist*)])
+    (if e
+        (let ([cell (cdr e)])
+          (if (eq? which 'refute)
+              (set-car! cell (add1 (car cell)))
+              (set-cdr! cell (add1 (cdr cell)))))
+        (set! *view-tally-alist*
+              (cons (cons label (if (eq? which 'refute) (cons 1 0) (cons 0 1)))
+                    *view-tally-alist*)))))
+
+(define (view-store-changed? st entry-M entry-C)
+  (or (not (eq? entry-M (subst-map (state-S st))))
+      (not (eq? entry-C (state-C st)))))
+
+(define (tally/d label goal)
+  (lambda (unsound-fail-depth)
+    (let ([g1 (goal unsound-fail-depth)])
+      (lambda (suspend-depth)
+        (let ([g2 (g1 suspend-depth)])
+          (lambda (st)
+            (let ([entry-M (subst-map (state-S st))]
+                  [entry-C (state-C st)])
+              (let ([result (g2 st)])
+                (case-inf/d result
+                  [() (view-tally-bump! label 'refute)]
+                  [(c^) (when (view-store-changed? c^ entry-M entry-C)
+                          (view-tally-bump! label 'force))]
+                  [(c f) (when (view-store-changed? c entry-M entry-C)
+                           (view-tally-bump! label 'force))]
+                  [(ch fh) (when (view-store-changed? ch entry-M entry-C)
+                             (view-tally-bump! label 'force))])
+                result))))))))
+
+;; Print the per-view tally (nothing when empty, so non-tallied runs are
+;; unaffected).  Called from the `run` macro's report path, alongside
+;; print-counters!.
+(define (print-view-tallies)
+  (unless (null? *view-tally-alist*)
+    (let ([rows (list-sort (lambda (a b)
+                             (string<? (format "~a" (car a)) (format "~a" (car b))))
+                           *view-tally-alist*)])
+      (printf "  view tallies (label: refute/force):\n")
+      (for-each (lambda (e)
+                  (printf "    ~a: ~a/~a\n" (car e) (cadr e) (cddr e)))
+                rows))))
