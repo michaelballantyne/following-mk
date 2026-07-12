@@ -33,9 +33,11 @@ ignore-overhead-and-exhaust-search-space-reductions mode for a good
 while yet — the mainline loop is: sample the surviving stream, find a
 doomed family, build the cheap refuter/view, measure the reduction,
 repeat. Pure-Andorra firing (ce1) is the default in the enumerative
-regime. First-order rep demoted accordingly (overhead motivation out
-of scope; revisit when schedulability/debuggability blocks a
-reduction experiment).
+regime. Refinement (Michael): overhead IS in scope when it is
+measurement-blocking — an arm that OOMs or times out before producing
+its numbers (as every pre-view follower-ID config did) leaves the
+pruning question unanswered, and fixing that is reductions work, not
+optimization. Mere-inefficiency overhead stays out of scope.
 
 ## Now
 
@@ -67,10 +69,12 @@ reduction experiment).
   the views compose in, not the interleaving.
 
 - [ ] **First-order representation of the /d search** — design note
-  written (`claude/2026-07-12-200500-first-order-rep-design.md`);
-  DEMOTED per the evening regime call (its lead motivation is
-  overhead). Implement only when the explicit-search work or
-  debuggability blocks a reduction experiment.
+  written (`claude/2026-07-12-200500-first-order-rep-design.md`).
+  Standing: green-lit by Michael on conceptual-clarity grounds
+  ("easier to think about"), and its memory-sharing half is
+  measurement-enabling (the pre-view OOMs blocked whole experiment
+  cells). Its speed half stays deprioritized. Good next-session
+  opener.
 
 ## Next
 
