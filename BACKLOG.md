@@ -68,7 +68,14 @@ overhead when a pinning ground example exists (all three tasks). Live
 next items reset by the reflection
 `...-041925-reflection-bidirectionality-is-expressiveness-not-efficiency.md`:
 **3 (first-order rep — where the measured wins live)**, then 1b (unified
-termination view). Bidirectionality is now understood as an *expressiveness*
+termination view).
+
+**Update (2026-07-13, item 3 core RESOLVED):** the residual-goal engine is
+built and decision-equivalent to the closure engine (migration steps 1–4,
+`...-055818-residual-engine-built-and-decision-equivalent.md`). Live front is
+now **3b (cutover + delete closure engine)** and **3c (does settle's fresh-
+budget recompute rescue R2T/1b — the first new lever the engine unlocks)**.
+Bidirectionality is now understood as an *expressiveness*
 win (write once, run all directions, no inverse semantics), NOT a
 search-efficiency win — so the property-spec-as-efficiency line is closed
 and identity #1's defense is an expressiveness write-up (Later), decoupled
@@ -133,31 +140,44 @@ from search-cost claims.
   corners doc rather than chasing separately. Still open from the wave-2
   plan: rung-4b relevance ablation vs the untyped stack.
 
-- [ ] **3. Residual-goal engine (first-order representation of the /d
-  search). TOP PRIORITY.** Design REDONE with Michael 2026-07-13:
-  `claude/2026-07-13-051843-residual-goals-design.md` — a suspended
-  follower is a *residual goal* (flat conjunction of blocked
-  g-disj/g-call suspensions); evaluation is `settle`; the old
-  defunctionalization plan (`...-200500-first-order-rep-design.md`) and
-  its step-1 site registry are SUPERSEDED (registry code + tests removed;
-  the label survives as the node name field; the tv2 byte-identical
-  baseline 2,615,131 remains the old-engine reference). Key design
-  decisions recorded in the note: flatness invariant (determinate
-  progress flattens, only frozen speculation nests), guard policy
-  (recompute uncommitted — matches today's engine; failure is monotone,
-  success is not, so alive?-flags memo death only), naming
-  (g-==/g-conj/g-disj/g-call), budget = expansions per path per settle
-  pass. **Next: migration step 1–3** — build `settle` + records in
-  parallel, port base-case-patho/d, differential-test *decisions*
-  (refute/commit/suspend per trigger) against the closure engine, NOT
-  byte-identical counters. The explicit scheduler then reads the residual
-  frontier directly (size/cost-frontier priority queue with views as the
-  pruning/forcing layer), recovering mk's implicit heuristics explicitly:
-  geometric demotion of deep spines → the termination view; ordering luck
-  → the size guarantee; completeness via fairness → levels complete by
-  construction. Neither project identity constrains the scheduler;
-  protect the relational substrate the views compose in, not the
-  interleaving.
+- [x] **3. Residual-goal engine — core BUILT and decision-equivalent
+  (migration steps 1–4).** RESOLVED for the engine question:
+  `claude/2026-07-13-055818-residual-engine-built-and-decision-equivalent.md`.
+  `residual.scm` implements the datatype (g-prim/g-conj/g-disj/g-alt/g-call
+  + g-blocked for budget-blocked hard suspensions) and `settle`, the
+  store-directed rewriter that replaces the four-way `inf/d`, resume
+  closures, `conj/d-run`/`conj/d-resume`, and hard-suspended with data.
+  Design tweak vs the note (`...-051843-residual-goals-design.md`): **budget
+  counts at g-disj (= conde/d), not g-call** — matches the closure engine's
+  `check-suspend-depth` exactly; g-call stays lazy but free (like fresh/d).
+  Validated differentially (tests/residual-{engine,interp,decisions}.scm,
+  suite 120→157): the FULL /d interpreter ports with ZERO settle changes
+  ("ports come free" demonstrated), and the per-trigger decision vector
+  (fail/singleton/suspend/cutoff) is IDENTICAL to the closure engine on all
+  six probes (conde/d work-count differs in the small, as the note predicted
+  and excluded). The engine the explicit scheduler needs now exists.
+
+- [ ] **3b. (spawned) Cutover + delete the closure engine (steps 5–6).**
+  Port R2/TY/NV to r-forms (mechanical, the interpreter proved it's free;
+  `concluding-oro/d`/R2T manipulates inf/d directly and is the non-viable
+  negative — drop or reimplement over residuals), rename r→canonical, delete
+  `inf/d`/`case-inf/d`/`conj/d-run`/`conj/d-resume`/hard-suspended, re-baseline
+  the synthesis benchmarks + experiments (settle passes / expansions / commits
+  / alt deaths / stamp hits) with a bridging counter table. Deferred from the
+  same session on purpose: a subtly-wrong views port that passes tests but
+  mis-measures is worse than two coexisting engines. Then the explicit
+  scheduler reads the residual g-disj/g-blocked frontier directly
+  (size/cost priority queue; child ordering in g-conj = pluggable policy),
+  recovering mk's implicit heuristics explicitly. Protect the relational
+  substrate the views compose in, not the interleaving.
+
+- [ ] **3c. (spawned, research) Does the R2T / 1b rescue fall out of settle?**
+  Pre-registered in the design note and the new entry: recompute-with-fresh-
+  budget each trigger should deepen the frontiers *inside* a residual g-disj's
+  alternatives — the single-frontier behaviour R2T's OR-of-suspensions
+  couldn't get. First genuinely new lever the engine unlocks; measure once
+  R2/R2P are ported (needs 3b's view port). If it works, it retires 1b's
+  design-pass and the negative-view R2T files become obsolete.
 
 ## Next
 

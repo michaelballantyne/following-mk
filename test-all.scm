@@ -13,6 +13,7 @@
 (load "tests/view-tallies.scm") ; depends on views.scm (loaded by untyped-interp)
 (load "tests/residual-engine.scm") ; residual engine vs closure engine (differential)
 (load "tests/residual-interp.scm") ; residual /d interpreter + refutation (differential)
+(load "tests/residual-decisions.scm") ; per-trigger decision-equivalence vs closure
 
 (test-summary)
 (when test-failed
