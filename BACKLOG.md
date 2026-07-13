@@ -50,16 +50,25 @@ work**. All four explored same session; symbolic examples got folded
 into the wave-2 Now item, the other survey ideas (abstract-domain
 views, coverage) wait in Next.
 
-**Session handoff (2026-07-13):** Tasks 1 and 2 both RESOLVED this
+**Session handoff (2026-07-13):** Tasks 1 and 2 RESOLVED earlier this
 session. Task 1: R2P works (interleave feasible), R2T diverges
 (structural negative), per-task measure selected
 (`...-040000-r2p-r2t-termination-generalization.md`). Task 2: wave-2
-measured (`...-042500-wave2-bidirectional-results.md`) — property specs
-(rev-involution) are the real flagship; weaker examples under-pin
-(minimality found degenerates). Live next items below: 1b (unified
-termination view), 2b (property-spec suite — the differentiator),
-2c (fix the wave-2 example arms + relevance ablation), then 3
-(first-order rep).
+measured (`...-042500-wave2-bidirectional-results.md`).
+
+**CORRECTION (2026-07-13, item 2b, `...-041637-property-specs-are-anchor-carried.md`):**
+the wave-2 headline "property specs (rev-involution) are the flagship /
+strongly-pinning" was **confounded** and is now retracted. A controlled
+experiment (property-only / anchor-only / property+anchor for append,
+rember, rev) shows: on every task, a SINGLE ground anchor pins the answer
+at least as well as the relational property and 5–64× cheaper in follower
+work; rev-anchor-only alone synthesizes canonical rev-acc that wave-2 had
+credited to the involution property. Relational property = pure follower
+overhead when a pinning ground example exists (all three tasks). The real
+differentiator is NOT "property vs example" but tasks where a pinning
+ground example is *structurally unavailable* — see new Now item 2d. Live
+next items: **2d (find the profit regime)**, 1b (unified termination view),
+then 3 (first-order rep).
 
 ## Now
 
@@ -99,22 +108,39 @@ termination view), 2b (property-spec suite — the differentiator),
   untyped+TY confirmed as default (wave-1 ports all within ±3% of
   typed). Prerequisites (a) ports, (e) tally all done.
 
-- [ ] **2b. (spawned) Property/relational spec suite** — the direction
-  that actually differentiates vs Burst/Trio/SMyth: universal specs the
-  interpreter can only discharge by running in entangled directions,
-  which are BOTH strongly-pinning AND E&T-inaccessible (unlike weaker
-  examples). Done: rev-involution. Add: rember idempotence
-  (`rember e (rember e l) = rember e l`), append associativity,
-  `length (append a b) = length a + length b`. This is where identity
-  #1 is defended; promote over more forward tasks.
+- [x] **2b. Property/relational spec suite** — RESOLVED, negatively and
+  importantly (`...-041637-property-specs-are-anchor-carried.md`).
+  Built as a controlled experiment (property-only / anchor-only /
+  property+anchor) for append-associativity, rember-idempotence, and a
+  decisive rev-anchor-only comparator. Finding: a single ground anchor
+  pins the answer at least as well as the relational property on all
+  three tasks and 5–64× cheaper; property-only always returns the
+  smallest degenerate (append `s`, rember `l`); the property changes
+  nothing about which program is found and adds only entangled-eval
+  follower cost. **Retracts the wave-2 flagship claim** (rev-involution
+  was anchor-carried). Consequence → 2d.
 
-- [ ] **2c. (spawned) Fix the wave-2 example arms** (methodology, cheap):
-  W2a rember-symbolic needs a middle-`e` example to force recursion
-  (the built set has only head/absent cases); W2b swap-partial needs
-  more of the output pinned. Symbolic/partial specs need an example
-  forcing each structural case — minimality exposes the gap every time.
-  Also still open from the wave-2 plan: (d) rung-4b relevance ablation
-  against the untyped stack, and the dataflow-relevance view if it bites.
+- [ ] **2d. (spawned) Find the PROFIT regime for the relational
+  substrate.** 2b showed the capability (run entangled, no inverse
+  semantics) is real but unprofitable whenever a pinning ground example
+  exists. The differentiator must be tasks where a pinning ground
+  example is *structurally unavailable*: (i) true relation synthesis
+  (no functional I/O to anchor); (ii) run-backward-only / partial-input
+  specs where the forward ground point doesn't pin; (iii) Michael's
+  Peano-length `length(append(a,b))=append(length(a),length(b))` with
+  `length` producing a unary list and `+`=append at the object level —
+  requires multi-function synthesis (co-synthesize length, or fix
+  append), so no single forward I/O pair pins it. This is a
+  task-SELECTION problem, not a view/engine problem. Pick one, build the
+  arm + an "is there any single ground example that pins this?" negative
+  check, measure.
+
+- [ ] **2c. Methodology note (cheap, now lower priority):** single ground
+  anchors UNDER-pin (rember head-wrap degenerate from
+  `(rember 5 (6 5))=(6)`); a spec needs one example per structural case
+  (this is why the wave-1 concrete rember used 4). Fold into the sharp-
+  corners doc rather than chasing separately. Still open from the wave-2
+  plan: rung-4b relevance ablation vs the untyped stack.
 
 - [ ] **3. First-order representation of the /d search, steps 1–2,
   then the explicit scheduler on top.** Design note:
