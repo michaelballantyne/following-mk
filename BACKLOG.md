@@ -157,6 +157,20 @@ from search-cost claims.
 
 ## Next
 
+- [x] **Do properties pay off on a HARD task? (Michael, 2026-07-13)** —
+  ANSWERED for swap: NO (`...-043200-do-properties-pay-off-on-hard-tasks.md`).
+  swap-pairs (bound 63, nested match — genuinely harder than rev/append/
+  rember) with the strong involution `swap∘swap=id`: anchor-only pins
+  canonical @63 (343k/14.2M/23s); property+anchor = SAME canonical @63 but
+  1.48×/3.2×/2.65× cost. The correction holds across the difficulty range —
+  swap is still anchor-pinnable (one 4-elt example forces both-pair-swap +
+  recursion). **Remaining open (harder):** does a task exist where NO single
+  example forces all structural cases but a property does, at a reachable
+  bound in this 5-form language? Suspected no; that's the last refuge of the
+  property-pays-off hypothesis and loops back to the reflection's "profit
+  regime" question. Not worth a dedicated hunt unless a candidate task
+  appears naturally.
+
 - [ ] **Length-domain abstract view** (survey #2): eval-lengtho/d
   over auto-abstracted examples; dense-forcing hypothesis on
   element-blind tasks (duplicate/append/evens/interleave); the
