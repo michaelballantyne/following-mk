@@ -134,8 +134,13 @@ from search-cost claims.
   plan: rung-4b relevance ablation vs the untyped stack.
 
 - [ ] **3. First-order representation of the /d search, steps 1–2,
-  then the explicit scheduler on top.** Design note:
-  `claude/2026-07-12-200500-first-order-rep-design.md`; green-lit by
+  then the explicit scheduler on top. NOW THE TOP PRIORITY** (2026-07-13
+  reflection: search strategy over spec shape). Design note:
+  `claude/2026-07-12-200500-first-order-rep-design.md`. **Step-1
+  implementation map ready** (registry + per-site constructors, file:line
+  anchors, byte-identical-counter regression via tv2/tv3):
+  `claude/2026-07-13-042503-first-order-rep-step1-implementation-map.md` —
+  start there. Green-lit by
   Michael on conceptual-clarity grounds; memory-sharing half is
   measurement-enabling; speed half stays deprioritized; step 2's
   printable follower trees also upgrade the sampling loop. The
