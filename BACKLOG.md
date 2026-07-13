@@ -167,20 +167,35 @@ from search-cost claims.
   one-sided cutoff divergence, pinned by a hard-coded witness test), stamp
   fast path explicitly deferred to cutover. Suite 157 → 171.
 
-- [ ] **3b. (spawned) Cutover + delete the closure engine (steps 5–6).**
-  Cutover bar (from the review's methodology note): every closure-engine
-  test file gets a residual port or a recorded reason it can't have one.
-  Port R2/TY/NV to r-forms (mechanical, the interpreter proved it's free;
-  `concluding-oro/d`/R2T manipulates inf/d directly and is the non-viable
-  negative — drop or reimplement over residuals), rename r→canonical, delete
-  `inf/d`/`case-inf/d`/`conj/d-run`/`conj/d-resume`/hard-suspended, re-baseline
-  the synthesis benchmarks + experiments (settle passes / expansions / commits
-  / alt deaths / stamp hits) with a bridging counter table. Deferred from the
-  same session on purpose: a subtly-wrong views port that passes tests but
-  mis-measures is worse than two coexisting engines. Then the explicit
-  scheduler reads the residual g-disj/g-blocked frontier directly
-  (size/cost priority queue; child ordering in g-conj = pluggable policy),
-  recovering mk's implicit heuristics explicitly. Protect the relational
+- [~] **3b. Cutover + delete the closure engine (steps 5–6).** FIRST HALF
+  DONE (2026-07-13, `...-073254-residual-engine-benchmark-parity.md`):
+  R1/R2/R2P/TY/NV and both interpreters (typed, untyped) ported to r-forms
+  (`residual-views.scm`, `residual-interp-following.scm`,
+  `residual-interp-untyped-following.scm`); suite 171→213, all green.
+  20 parallel benchmark arms (11 typed + 9 untyped+TY-default) run head to
+  head: **every completed comparison (19/20) produced byte-identical
+  answers**; the one exception (interleave, the sole no-termination-view
+  config) times out identically on both engines, twice each, at the same
+  bound — confirmed a real property of that arm, not a regression.
+  unify-main is consistently 2.4–11% higher on residual (never inverted,
+  every task) while unify-follower is consistently LOWER (sometimes ~half) —
+  read as the still-undeferred stamp fast path's absence (`residual.scm`
+  header says so explicitly), not a design flaw; falsifiable once stamps
+  land. `concluding-oro/d`/R2T remains unported (non-viable, backlog 3c).
+  `tally/d` has no residual port either (confirmed purely observational,
+  dropped in benchmark arms with no effect on counts/answers). Cutover bar
+  met: not a subtly-wrong port, a decision- and answer-equivalent one with a
+  bounded, explained overhead.
+  **STILL TO DO (second half, awaiting user go-ahead per their two-phase
+  request):** rename r→canonical, delete
+  `inf/d`/`case-inf/d`/`conj/d-run`/`conj/d-resume`/hard-suspended and the
+  closure-engine originals (`following.scm`'s conde/d machinery, `views.scm`,
+  the closure interpreters), re-baseline the synthesis benchmarks +
+  experiments (settle passes / expansions / commits / alt deaths / stamp
+  hits) with a bridging counter table. Then the explicit scheduler reads the
+  residual g-disj/g-blocked frontier directly (size/cost priority queue;
+  child ordering in g-conj = pluggable policy), recovering mk's implicit
+  heuristics explicitly. Protect the relational
   substrate the views compose in, not the interleaving.
 
 - [ ] **3c. (spawned, research) Does the R2T / 1b rescue fall out of settle?**
