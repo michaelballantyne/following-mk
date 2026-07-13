@@ -112,7 +112,7 @@
 ;;   exactly one guard live -> commit it    -> succeed
 ;;   both guards live       -> nondet       -> stall  (sound; existence holds
 ;;                                             but we don't need to confirm)
-(define (patho-oro/d fname ea eb)
+(define-relation/d (patho-oro/d fname ea eb)
   (conde/d
     ([]
      [(base-case-patho/d fname ea)]
@@ -123,7 +123,7 @@
 
 ;; AND over an argument list: every rand must itself have a clean path
 ;; (the rands are all evaluated on the one path, so AND is correct).
-(define (rands-patho/d fname rands)
+(define-relation/d (rands-patho/d fname rands)
   (conde/d
     ([]
      [(==/d '() rands)]
@@ -132,7 +132,7 @@
      [(==/d `(,a . ,d) rands)]
      [(base-case-patho/d fname a) (rands-patho/d fname d)])))
 
-(define (base-case-patho/d fname body)
+(define-relation/d (base-case-patho/d fname body)
   (conde/d
     ;; number literal -- path-clean
     ([]
@@ -364,7 +364,7 @@
 ;; the slot-th operand of a self-call must be a `smaller` bare variable.
 ;; Holey rands -> stall (rands could be '() or a pair).
 ;; ------------------------------------------------------------------
-(define (nth-rand-decreasing/d rands slot smallers)
+(define-relation/d (nth-rand-decreasing/d rands slot smallers)
   (conde/d
     ;; too few args: the slot-th operand is absent -> not decreasing -> refute
     ([]
@@ -381,7 +381,7 @@
 ;; every operand of an application must itself satisfy all-decreasing (nested
 ;; self-calls can hide inside operands).  AND over the operand list.
 ;; ------------------------------------------------------------------
-(define (rands-all-decreasing/d fname rands slot sames smallers)
+(define-relation/d (rands-all-decreasing/d fname rands slot sames smallers)
   (conde/d
     ([]
      [(==/d '() rands)]
@@ -414,7 +414,7 @@
 ;;   e is any other determined shape                  -> x,y unclassified
 ;;   e holey                                           -> stall
 ;; ------------------------------------------------------------------
-(define (sym-scrutinee-branch/d fname e x y e2 slot sames smallers)
+(define-relation/d (sym-scrutinee-branch/d fname e x y e2 slot sames smallers)
   ;; e is known to be a symbol here; membership in sames U smallers decides.
   (let ([classified (append sames smallers)])
     (conde/d
@@ -427,7 +427,7 @@
        [(not-member-of/d e classified)]
        [(all-decreasing-at/d fname e2 slot sames smallers)]))))
 
-(define (match-branch-decreasing/d fname e x y e2 slot sames smallers)
+(define-relation/d (match-branch-decreasing/d fname e x y e2 slot sames smallers)
   ;; discriminate on the scrutinee's shape; a hole makes several clauses live
   ;; -> stall.  Only a bare classified variable extends the environment.
   (conde/d
@@ -466,7 +466,7 @@
 ;; the core walk: EVERY self-call in `body` is decreasing at `slot`, given the
 ;; environment (sames, smallers).  Conjunction over subterms throughout.
 ;; ------------------------------------------------------------------
-(define (all-decreasing-at/d fname body slot sames smallers)
+(define-relation/d (all-decreasing-at/d fname body slot sames smallers)
   (conde/d
     ;; number literal -- no self-call
     ([]
@@ -774,7 +774,7 @@
 ;; no extension.  The membership guards are mutually exclusive (e is in at most
 ;; one family), so a ground e commits exactly one clause; a still-unbound symbol
 ;; var makes the membership tests stall.  arity <= 2 written out explicitly.
-(define (sym-scrutinee-perm/d fname e x y e2 psets)
+(define-relation/d (sym-scrutinee-perm/d fname e x y e2 psets)
   (let ([n (length psets)])
     (cond
       [(= n 1)
@@ -813,7 +813,7 @@
 
 ;; discriminate on a match scrutinee's shape; a hole -> stall.  Only a bare
 ;; classified variable extends the environment (via sym-scrutinee-perm/d).
-(define (match-branch-perm/d fname e x y e2 psets)
+(define-relation/d (match-branch-perm/d fname e x y e2 psets)
   (conde/d
     ([]
      [(symbolo/d e)]
@@ -841,7 +841,7 @@
 
 ;; every operand of an application must itself satisfy all-decreasing (nested
 ;; self-calls can hide inside operands).  AND over the operand list.
-(define (rands-all-perm/d fname rands psets)
+(define-relation/d (rands-all-perm/d fname rands psets)
   (conde/d
     ([]
      [(==/d '() rands)]
@@ -854,7 +854,7 @@
 ;; the core walk: EVERY self-call in `body` is permuted-decreasing, given the
 ;; per-parameter environment `psets`.  Conjunction over subterms throughout
 ;; (for-ALL over self-calls, so no path-OR).  Mirrors R2's all-decreasing-at/d.
-(define (all-decreasing-perm/d fname body psets)
+(define-relation/d (all-decreasing-perm/d fname body psets)
   (conde/d
     ;; number literal -- no self-call
     ([]
@@ -1104,149 +1104,15 @@
 ;; (Discarding a pure check's extensions is always sound -- it only forgoes
 ;; pruning.)  The disjuncts here are pure checks, so nothing of value is
 ;; discarded.
-
-;; classify an inf/d result (see case-inf/d in following.scm).
-(define (inf/d-kind r)
-  (case-inf/d r
-    [() 'refute]
-    [(c) 'success]
-    [(c f) 'soft]
-    [(ch fh) 'hard]))
-
-(define (concluding-oro/d g1 g2)
-  (lambda (unsound-fail-depth)
-    (letrec ([or-g
-              (lambda (suspend-depth)
-                (lambda (st)
-                  (let ([r1 (((g1 unsound-fail-depth) suspend-depth) st)])
-                    (if (not r1)
-                        ;; g1 definitively refuted: the disjunction IS g2.
-                        (((g2 unsound-fail-depth) suspend-depth) st)
-                        (let ([r2 (((g2 unsound-fail-depth) suspend-depth) st)])
-                          (if (not r2)
-                              ;; g2 definitively refuted: the disjunction IS g1.
-                              r1
-                              (let ([k1 (inf/d-kind r1)]
-                                    [k2 (inf/d-kind r2)])
-                                (cond
-                                  ;; some disjunct definitively true -> conclude;
-                                  ;; entry state (no extension is forced).
-                                  [(or (eq? k1 'success) (eq? k2 'success))
-                                   st]
-                                  ;; some disjunct soft-suspended -> soft-stall,
-                                  ;; retry the whole disjunction.
-                                  [(or (eq? k1 'soft) (eq? k2 'soft))
-                                   (cons st or-g)]
-                                  ;; both hard-suspended -> defer to retrigger.
-                                  [else (make-hard-suspended st or-g)]))))))))])
-      or-g)))
-
-;; the public relation: R2 OR R2P, whole-body each.
-(define (terminating-recursiono/d fname params body)
-  (concluding-oro/d
-    (decreasing-recursiono/d fname params body)
-    (permuted-decreasing-recursiono/d fname params body)))
-
-;;; ------------------------------------------------------------------
-;;; Validation gates.  Run when this file is loaded (./run.sh loads it).
-;;; ------------------------------------------------------------------
-
-;; ACCEPT: the two halves of the R2/R2P incomparability, both now accepted.
-
-;; rev-acc: R2 accepts (fixed position l), R2P refutes (growing accumulator).
-(test "terminating-recursiono/d: rev-acc accepted (via R2 disjunct)"
-  (run 1 (q)
-    (follower q
-      (terminating-recursiono/d 'rev '(l acc)
-        '(match l ['() acc] [(cons a d) (rev d (cons a acc))]))))
-  '(_.0))
-
-;; interleave: R2 refutes (argument swap), R2P accepts (swap assignment).
-(test "terminating-recursiono/d: interleave accepted (via R2P disjunct)"
-  (run 1 (q)
-    (follower q
-      (terminating-recursiono/d 'interleave '(l1 l2)
-        '(match l1 ['() l2] [(cons a d) (cons a (interleave l2 d))]))))
-  '(_.0))
-
-;; canonical rember: BOTH disjuncts accept -> the disjunction concludes
-;; success (this is the row where oro/d would have stalled forever).
-(test "terminating-recursiono/d: canonical rember accepted (both disjuncts)"
-  (run 1 (q)
-    (follower q
-      (terminating-recursiono/d 'rember '(e l)
-        '(match l ['() l] [(cons a d) (if (= a e) d (cons a (rember e d)))]))))
-  '(_.0))
-
-;; (interleave d d): R2P refutes (non-injective) but R2 accepts (slot 1
-;; decreases in every call -- a sound fixed-position measure; the body DOES
-;; terminate), so the disjunction ACCEPTS.
-(test "terminating-recursiono/d: (interleave d d) accepted (via R2 disjunct)"
-  (run 1 (q)
-    (follower q
-      (terminating-recursiono/d 'interleave '(l1 l2)
-        '(match l1 ['() l2] [(cons a d) (interleave d d)]))))
-  '(_.0))
-
-;; (rember d e): R2 refutes (argument swap) but R2P accepts (swap assignment
-;; d<-l strict, e<-e same), so the disjunction ACCEPTS.
-(test "terminating-recursiono/d: (rember d e) accepted (via R2P disjunct)"
-  (run 1 (q)
-    (follower q
-      (terminating-recursiono/d 'rember '(e l)
-        '(match l ['() l] [(cons a d) (rember d e)]))))
-  '(_.0))
-
-;; REFUTE: only when BOTH measures reject.
-
-(test "terminating-recursiono/d: (rember e l) refuted (both measures reject)"
-  (run 1 (q)
-    (follower q
-      (terminating-recursiono/d 'rember '(e l)
-        '(match l ['() l] [(cons a d) (rember e l)]))))
-  '())
-
-(test "terminating-recursiono/d: (rember e (cons a l)) refuted (both reject)"
-  (run 1 (q)
-    (follower q
-      (terminating-recursiono/d 'rember '(e l)
-        '(match l ['() l] [(cons a d) (rember e (cons a l))]))))
-  '())
-
-;; STALL: one disjunct refutes, the other stalls -> must STALL, not refute.
-
-;; R2 refutes this whole body outright (both slots fail at the ground
-;; self-call (rember d e), and a refuted conjunct dominates the stalled hole);
-;; R2P stalls (self-call fine via swap; the nil-branch hole is undecided).
-(test "terminating-recursiono/d: R2-refutes/R2P-stalls -> stalls, hole unbound"
-  (run 1 (h)
-    (follower h
-      (terminating-recursiono/d 'rember '(e l)
-        `(match l ['() ,h] [(cons a d) (rember d e)]))))
-  '(_.0))
-
-;; mirror image: R2P refutes this body outright ((interleave d d) is
-;; non-injective, refuted conjunct dominates); R2 stalls (slot 1 fine, the
-;; nil-branch hole is undecided).
-(test "terminating-recursiono/d: R2P-refutes/R2-stalls -> stalls, hole unbound"
-  (run 1 (h)
-    (follower h
-      (terminating-recursiono/d 'interleave '(l1 l2)
-        `(match l1 ['() ,h] [(cons a d) (interleave d d)]))))
-  '(_.0))
-
-;; STALL on plain holes, holes left unbound.
-(test "terminating-recursiono/d: holey match stalls, holes unbound"
-  (run 1 (h1 h2)
-    (follower (list h1 h2)
-      (terminating-recursiono/d 'rember '(e l)
-        `(match l ['() ,h1] [(cons a d) ,h2]))))
-  '((_.0 _.1)))
-
-(test "terminating-recursiono/d: bare hole stalls"
-  (run 1 (q)
-    (follower q (terminating-recursiono/d 'rember '(e l) q)))
-  '(_.0))
+;;
+;; *** CODE REMOVED AT CUTOVER. ***  inf/d-kind / concluding-oro/d /
+;; terminating-recursiono/d were written directly against the deleted closure
+;; engine's inf/d / case-inf/d / hard-suspended representation, which has no
+;; residual analogue.  The analysis above is kept as DOCUMENTATION of the
+;; recorded negative; whether some single-frontier combinator over two residual
+;; sub-walks could rescue whole-body R2-OR-R2P termination checking is an open
+;; research question tracked as backlog item 3c.  Full mechanism:
+;; claude/2026-07-13-040000-r2p-r2t-termination-generalization.md.
 
 ;; === TY: type-ofo/d --- rung 3 / third follower view: a /d TYPE checker
 ;; for the restricted language, composed into a follower alongside rungs 1 & 2.
@@ -1320,7 +1186,7 @@
 ;; type looked up for the operator.  AND over the two lists walked together;
 ;; a length mismatch (arity error) -> refute; a holey rand tail -> stall.
 ;; ------------------------------------------------------------------
-(define (types-listo/d tyenv rands argtypes)
+(define-relation/d (types-listo/d tyenv rands argtypes)
   (conde/d
     ([]
      [(==/d '() rands) (==/d '() argtypes)]
@@ -1332,7 +1198,7 @@
 ;; ------------------------------------------------------------------
 ;; the public relation.
 ;; ------------------------------------------------------------------
-(define (type-ofo/d tyenv body type)
+(define-relation/d (type-ofo/d tyenv body type)
   (conde/d
     ;; number literal : number
     ([]
@@ -1507,7 +1373,7 @@
 ;; AND over an argument/operand list: every rand must itself be free of
 ;; vacuous tests (no path logic -- a for-all over the whole subterm).
 ;; ------------------------------------------------------------------
-(define (rands-non-vacuouso/d rands)
+(define-relation/d (rands-non-vacuouso/d rands)
   (conde/d
     ([]
      [(==/d '() rands)]
@@ -1519,7 +1385,7 @@
 ;; ------------------------------------------------------------------
 ;; the public relation: the whole-term walk.
 ;; ------------------------------------------------------------------
-(define (non-vacuous-testso/d body)
+(define-relation/d (non-vacuous-testso/d body)
   (conde/d
     ;; number literal -- no if-nodes
     ([]

@@ -1,6 +1,5 @@
-;; r2p-gates.scm --- re-runnable gates for R2P (permuted-decreasing-recursiono/d)
-;; and R2T (terminating-recursiono/d), the generalized / production termination
-;; views.  Cheap checks only (no ID runs).
+;; r2p-gates.scm --- re-runnable gates for R2P (permuted-decreasing-recursiono/d),
+;; the generalized termination view.  Cheap checks only (no ID runs).
 ;;
 ;;   ./run.sh experiments/r2p-gates.scm
 ;;
@@ -9,8 +8,13 @@
 ;; descendant), with the assignment free to differ per call site.  See the R2P
 ;; section of views.scm for the soundness argument.
 ;;
-;; R2T is the whole-body disjunction R2 OR R2P (never mixed per-site); it
-;; refutes only when BOTH measures refute.  See the R2T section of views.scm.
+;; *** CUTOVER NOTE: family (5), R2T (terminating-recursiono/d) gates, REMOVED.
+;; *** R2T's code was deleted from views.scm at cutover (backlog 3b) -- it was
+;; written directly against the closure engine's inf/d representation, has no
+;; residual analogue, and rescuing it is the open research question tracked as
+;; backlog 3c.  See views.scm's R2T section (comments preserved there) and
+;; claude/2026-07-13-040000-r2p-r2t-termination-generalization.md for the full
+;; non-viable-negative analysis this file's family (5) used to gate.
 ;;
 ;; Gate families:
 ;;   (1) R2P ACCEPT: the nine canonical bodies... EXCEPT rev-acc (see finding).
@@ -20,11 +24,6 @@
 ;;       (f d d).
 ;;   (3) R2P STALL: holey self-call argument, holey match arms, bare hole.
 ;;   (4) CURIOSITY: R2 vs R2P on the non-injective (interleave d d).
-;;   (5) R2T: ALL NINE canonicals accepted (rev-acc via the R2 disjunct AND
-;;       interleave via the R2P disjunct -- the whole point), the machine
-;;       minimals, refutes only both-reject cases (each disjunct's individual
-;;       rejection verified first), stalls on holes and on the asymmetric
-;;       one-refutes/other-stalls cases.
 ;;
 ;; *** FINDING (see report): R2P is INCOMPARABLE to R2, not a generalization. ***
 ;; rev-acc's canonical recurses as (rev d (cons a acc)): the accumulator arg
@@ -32,8 +31,9 @@
 ;; that R2P uses cannot decrease (l shrinks by 1, acc grows by 1 -> sum flat).
 ;; R2P therefore REFUTES rev-acc, which R2 ACCEPTS via its fixed-position (l)
 ;; measure.  Conversely R2P ACCEPTS interleave, which R2 refutes.  Neither view
-;; dominates; the production termination view is the disjunction -- implemented
-;; as R2T (terminating-recursiono/d), gated in family (5) below.
+;; dominates; the (former) production termination view was the disjunction --
+;; R2T, no longer available; per-task measure selection (R2 default, R2P for
+;; argument-permuting recursion) is the current decision, per BACKLOG.md.
 
 (load "experiments/id-harness.scm")
 (load "views.scm") ; R1..R2P + R2T + TY + NV
@@ -153,89 +153,5 @@
 (test "CURIOSITY R2 accepts (interleave d d) [fixed-position ignores slot-2 collision]"
   (run 1 (q) (follower q (decreasing-recursiono/d 'interleave '(l1 l2)
     '(match l1 ['() l2] [(cons a d) (interleave d d)])))) '(_.0))
-
-;; ===========================================================================
-;; (5) R2T terminating-recursiono/d: the production disjunction R2 OR R2P.
-;; ===========================================================================
-
-;; --- ACCEPT: all NINE canonicals (the whole point of the disjunction) ---
-(test "R2T rember accepted"
-  (run 1 (q) (follower q (terminating-recursiono/d 'rember '(e l) rember-canon))) '(_.0))
-(test "R2T append accepted"
-  (run 1 (q) (follower q (terminating-recursiono/d 'append '(l s) append-canon))) '(_.0))
-(test "R2T duplicate accepted"
-  (run 1 (q) (follower q (terminating-recursiono/d 'duplicate '(l) duplicate-canon))) '(_.0))
-(test "R2T member accepted"
-  (run 1 (q) (follower q (terminating-recursiono/d 'member '(e l) member-canon))) '(_.0))
-(test "R2T last accepted"
-  (run 1 (q) (follower q (terminating-recursiono/d 'last '(l) last-canon))) '(_.0))
-(test "R2T swap (human canonical) accepted"
-  (run 1 (q) (follower q (terminating-recursiono/d 'swap '(l) swap-canon))) '(_.0))
-(test "R2T swap (machine-minimal, size 63) accepted"
-  (run 1 (q) (follower q (terminating-recursiono/d 'swap '(l) swap-min))) '(_.0))
-(test "R2T evens (human canonical) accepted"
-  (run 1 (q) (follower q (terminating-recursiono/d 'evens '(l) evens-canon))) '(_.0))
-(test "R2T evens (recursive return-l minimal variant) accepted"
-  (run 1 (q) (follower q (terminating-recursiono/d 'evens '(l) evens-min))) '(_.0))
-;; the two incomparability halves, each accepted via its own disjunct:
-(test "R2T rev-acc accepted (via R2 disjunct) [HEADLINE]"
-  (run 1 (q) (follower q (terminating-recursiono/d 'rev '(l acc) rev-canon))) '(_.0))
-(test "R2T interleave accepted (via R2P disjunct) [HEADLINE]"
-  (run 1 (q) (follower q (terminating-recursiono/d 'interleave '(l1 l2) interleave-canon))) '(_.0))
-
-;; --- REFUTE: only when BOTH measures reject.  Verify each disjunct's
-;; individual rejection first, then the disjunction's. ---
-
-;; (rember e l): no strict decrease anywhere.
-(test "R2 rejects (rember e l) [disjunct check]"
-  (run 1 (q) (follower q (decreasing-recursiono/d 'rember '(e l)
-    '(match l ['() l] [(cons a d) (rember e l)])))) '())
-(test "R2P rejects (rember e l) [disjunct check]"
-  (run 1 (q) (follower q (permuted-decreasing-recursiono/d 'rember '(e l)
-    '(match l ['() l] [(cons a d) (rember e l)])))) '())
-(test "R2T (rember e l) refuted (both measures reject)"
-  (run 1 (q) (follower q (terminating-recursiono/d 'rember '(e l)
-    '(match l ['() l] [(cons a d) (rember e l)])))) '())
-
-;; (rember e (cons a l)): ascending cons-expression argument.
-(test "R2 rejects (rember e (cons a l)) [disjunct check]"
-  (run 1 (q) (follower q (decreasing-recursiono/d 'rember '(e l)
-    '(match l ['() l] [(cons a d) (rember e (cons a l))])))) '())
-(test "R2P rejects (rember e (cons a l)) [disjunct check]"
-  (run 1 (q) (follower q (permuted-decreasing-recursiono/d 'rember '(e l)
-    '(match l ['() l] [(cons a d) (rember e (cons a l))])))) '())
-(test "R2T (rember e (cons a l)) refuted (both reject)"
-  (run 1 (q) (follower q (terminating-recursiono/d 'rember '(e l)
-    '(match l ['() l] [(cons a d) (rember e (cons a l))])))) '())
-
-;; NOTE: the third R2P refutation case, non-injective (interleave d d), is NOT
-;; an R2T refutation -- R2 accepts it (slot 1 strictly decreases in every
-;; call; the body genuinely terminates), so the disjunction ACCEPTS.  Gated as
-;; ACCEPT deliberately: R2T refutes only when both measures reject.
-(test "R2T (interleave d d) accepted (via R2 disjunct; R2P alone refutes)"
-  (run 1 (q) (follower q (terminating-recursiono/d 'interleave '(l1 l2)
-    '(match l1 ['() l2] [(cons a d) (interleave d d)])))) '(_.0))
-;; mirror: R2's argument-swap refutation case is R2T-accepted via R2P.
-(test "R2T (rember d e) accepted (via R2P disjunct; R2 alone refutes)"
-  (run 1 (q) (follower q (terminating-recursiono/d 'rember '(e l)
-    '(match l ['() l] [(cons a d) (rember d e)])))) '(_.0))
-
-;; --- STALL: one disjunct refutes + the other stalls -> stall, NOT refute ---
-(test "R2T R2-refutes/R2P-stalls -> stalls, hole unbound"
-  (run 1 (h) (follower h (terminating-recursiono/d 'rember '(e l)
-    `(match l ['() ,h] [(cons a d) (rember d e)])))) '(_.0))
-(test "R2T R2P-refutes/R2-stalls -> stalls, hole unbound"
-  (run 1 (h) (follower h (terminating-recursiono/d 'interleave '(l1 l2)
-    `(match l1 ['() ,h] [(cons a d) (interleave d d)])))) '(_.0))
-
-;; --- STALL on holes ---
-(test "R2T self-call with holey arg stalls"
-  (run 1 (h) (follower h (terminating-recursiono/d 'rember '(e l)
-    `(match l ['() l] [(cons a d) (rember e ,h)])))) '(_.0))
-(test "R2T holey match arms stall, holes unbound"
-  (run 1 (h1 h2) (follower (list h1 h2) (terminating-recursiono/d 'rember '(e l)
-    `(match l ['() ,h1] [(cons a d) ,h2])))) '((_.0 _.1)))
-(test "R2T bare hole stalls"
-  (run 1 (q) (follower q (terminating-recursiono/d 'rember '(e l) q))) '(_.0))
 
 (test-summary)

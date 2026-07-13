@@ -138,7 +138,10 @@
        (== x 1)
        (r)))))
 
-(define (r/d)
+;; r/d recurses through a sole-survivor conde/d with no base case, so it MUST
+;; be a define-relation/d (a plain define with a self-reference would loop at
+;; construction time under the residual engine's eager expansion).
+(define-relation/d (r/d)
   (conde/d
     ([x]
      [(==/d x 1)]

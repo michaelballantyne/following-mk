@@ -15,10 +15,15 @@
 ;;   (cons residual st)         -> suspended; residual is a flat conjunction of
 ;;                                 blocked g-disj nodes (store- or budget-blocked)
 ;;
-;; This file is loaded ALONGSIDE the closure engine (following.scm) during
-;; migration, so its surface constructors are prefixed `r` (rconde/d, rfresh/d,
-;; r==/d, ...) to avoid clashing.  At cutover they take the canonical names and
-;; the closure engine is deleted.
+;; This is THE follower engine.  `settle` and the residual-goal datatype below
+;; are the determinacy-directed evaluator that (conde/d ...), (fresh/d ...) and
+;; the /d primitives (==/d, =/=/d, absento/d, symbolo/d, numbero/d, stringo/d)
+;; compile into.  following.scm holds the follower DRIVER
+;; (run-and-set-follower / trigger-followers) and the counters; this file holds
+;; the goal representation and the settle rewriter.  (Historical note: this
+;; began as an `r`-prefixed parallel port coexisting with a closure engine;
+;; the closure engine was deleted at cutover and these took the canonical
+;; names.  Comments below still contrast against it to explain the design.)
 ;;
 ;; NOT YET IMPLEMENTED: the stamp fast path.  The design note's incrementality
 ;; story (each node carries the store version it last settled against, so an
@@ -75,6 +80,15 @@
 ;; at the next trigger, when depth resets to 0 (fresh budget).
 (define-record-type g-blocked (fields disj))
 
+;; A thin per-view attribution wrapper (tally/d).  `goal` is any goal node;
+;; `label` a symbol ('R1, 'TY, ...).  settle-tally settles `goal` transparently
+;; and bumps the label's refute/force tally (bookkeeping in following.scm).
+;; NOT a control construct -- it changes no decisions.  Used only in benchmark
+;; arms, never in the core engine or the interpreter.  A g-tally may wrap a
+;; g-blocked (or another g-tally over one): partition-blocked sees through it
+;; via tally-blocked? so a budget-blocked child stays HARD, never re-swept.
+(define-record-type g-tally (fields label goal))
+
 ;; TOP, the empty conjunction / fully-determinate success.
 (define g-top (make-g-conj '()))
 (define (g-top? g) (and (g-conj? g) (null? (g-conj-goals g))))
@@ -91,6 +105,7 @@
     [(g-prim? g) (settle-prim g st)]
     [(g-conj? g) (settle-conj (g-conj-goals g) st depth)]
     [(g-disj? g) (settle-disj g st depth)]
+    [(g-tally? g) (settle-tally g st depth)]
     [(g-call? g) (settle-call g st depth)]
     ;; g-blocked is the TRIGGER-PATH re-attempt only: a budget-blocked disj
     ;; carried in the residual conjunction is re-settled with the current
@@ -100,13 +115,26 @@
     [(g-blocked? g) (settle-disj (g-blocked-disj g) st depth)]
     [else (error 'settle "not a goal node" g)]))
 
-;; Split a list of flat residual conjuncts into store-blocked (soft, g-disj)
-;; and budget-blocked (hard, g-blocked) pools.
+;; A conjunct is HARD (budget-blocked, deferred to the next trigger, NEVER
+;; re-swept mid-pass) iff it is a g-blocked OR a g-tally wrapping one.  Seeing
+;; through the tally wrapper is load-bearing: otherwise a tally-wrapped
+;; g-blocked would read as an opaque soft node, get re-settled on every store
+;; change, and re-expand its hidden g-blocked child -- reintroducing the
+;; exponential commit-splice bug (finding 1) inside the tally wrapper.
+(define (tally-blocked? node)
+  (and (g-tally? node)
+       (or (g-blocked? (g-tally-goal node))
+           (tally-blocked? (g-tally-goal node)))))
+
+;; Split a list of flat residual conjuncts into store-blocked (soft, g-disj or
+;; a g-tally over one) and budget-blocked (hard, g-blocked or a g-tally over
+;; one) pools.
 (define (partition-blocked nodes)
   (let loop ([nodes nodes] [soft '()] [hard '()])
     (cond
       [(null? nodes) (values (reverse soft) (reverse hard))]
-      [(g-blocked? (car nodes)) (loop (cdr nodes) soft (cons (car nodes) hard))]
+      [(or (g-blocked? (car nodes)) (tally-blocked? (car nodes)))
+       (loop (cdr nodes) soft (cons (car nodes) hard))]
       [else (loop (cdr nodes) (cons (car nodes) soft) hard)])))
 
 ;; A leaf commits into the store or fails; never residual.
@@ -228,77 +256,75 @@
                          (cons (car alts) alive))])))))))
 
 ;;; ------------------------------------------------------------------
-;;; Follower integration
-;;;
-;;; A residual follower goal plugs into the EXISTING closure-engine follower
-;;; machinery (follower / run-and-set-follower / trigger-followers) by matching
-;;; the inf/d protocol at the follower-goal boundary: settle, then convert the
-;;; result to #f / state / (state . resume).  Each trigger settles from depth 0
-;;; (matching the closure engine, where only top-level re-fires refresh depth).
+;;; tally/d: per-view attribution (bookkeeping helpers live in following.scm)
 ;;; ------------------------------------------------------------------
 
-(define (settle->inf/d G st)
-  (let ([r (settle G st 0)])
-    (cond
-      [(not r) #f]                              ; refuted
-      [(g-top? (car r)) (cdr r)]                ; singleton success
-      [else
-       ;; suspended (soft): check the flatness invariant on every trigger --
-       ;; O(residual width), turns the design note's prose invariant into a
-       ;; checked property at the one place every live residual passes through.
-       (assert-flat-residual! (car r))
-       (cons (cdr r) (residual-resume (car r)))])))
+;; settle-tally: settle the wrapped goal transparently (no decision change),
+;; then attribute the outcome to `label` -- refute on #f, force on a store
+;; change vs entry (a pure stall moves neither counter).  On a suspended
+;; result, RE-WRAP EACH SURVIVING CONJUNCT in its own same-labeled g-tally --
+;; NEVER the whole pool in one wrapper.  Wrapping each conjunct individually
+;; keeps each one's true store/budget-blocked nature visible underneath the
+;; wrapper, so partition-blocked (via tally-blocked?) still defers a
+;; budget-blocked child instead of re-sweeping it on every store change.  A
+;; single whole-pool wrapper would read as one opaque soft node and re-expand
+;; its hidden g-blocked children each pass -- the exact exponential
+;; commit-splice bug of finding 1, relocated inside the tally wrapper.  The
+;; force test is the cheap unify-free store-identity comparison.
+(define (settle-tally g st depth)
+  (let ([label (g-tally-label g)]
+        [entry-M (subst-map (state-S st))]
+        [entry-C (state-C st)])
+    (let ([r (settle (g-tally-goal g) st depth)])
+      (cond
+        [(not r) (view-tally-bump! label 'refute) #f]
+        [else
+         (when (view-store-changed? (cdr r) entry-M entry-C)
+           (view-tally-bump! label 'force))
+         (if (g-top? (car r))
+             r
+             (cons (make-g-conj
+                    (map (lambda (c) (make-g-tally label c))
+                         (g-conj-goals (car r))))
+                   (cdr r)))]))))
 
-;; Resume thunk of the shape conj/d-run / run-and-set-follower expect:
-;; (lambda (suspend-depth) (lambda (st) inf/d)).  suspend-depth is ignored --
-;; a residual always re-settles from depth 0.
-(define (residual-resume resid)
-  (lambda (_sd)
-    (lambda (st)
-      (settle->inf/d resid st))))
-
-;; Wrap a residual goal node G as a /d goal usable with (follower term ...):
-;; (lambda (unsound-fail-depth) (lambda (suspend-depth) (lambda (st) inf/d))).
-(define (follower-residual-goal G)
-  (lambda (_ufd)
-    (lambda (_sd)
-      (lambda (st)
-        (settle->inf/d G st)))))
+;; (tally/d label goal): wrap `goal` in a labeled attribution node.
+(define (tally/d label goal) (make-g-tally label goal))
 
 ;;; ------------------------------------------------------------------
-;;; Residual surface constructors (prefixed `r` during migration)
+;;; Surface constructors: the /d goal vocabulary
 ;;; ------------------------------------------------------------------
 
 ;; Primitive leaves.  ==/d is counted as follower work (==-counted); the rest
 ;; go through the base constraint goals, which the mk.scm unify counter already
 ;; attributes to *follower-unify-counter* while *in-follower-eval?* is set.
-(define (r==/d u v)      (make-g-prim '== (list u v) (==-counted u v)))
-(define (r=/=/d u v)     (make-g-prim '=/= (list u v) (=/= u v)))
-(define (rabsento/d u v) (make-g-prim 'absento (list u v) (absento u v)))
-(define (rsymbolo/d u)   (make-g-prim 'symbolo (list u) (symbolo u)))
-(define (rnumbero/d u)   (make-g-prim 'numbero (list u) (numbero u)))
-(define (rstringo/d u)   (make-g-prim 'stringo (list u) (stringo u)))
+(define (==/d u v)      (make-g-prim '== (list u v) (==-counted u v)))
+(define (=/=/d u v)     (make-g-prim '=/= (list u v) (=/= u v)))
+(define (absento/d u v) (make-g-prim 'absento (list u v) (absento u v)))
+(define (symbolo/d u)   (make-g-prim 'symbolo (list u) (symbolo u)))
+(define (numbero/d u)   (make-g-prim 'numbero (list u) (numbero u)))
+(define (stringo/d u)   (make-g-prim 'stringo (list u) (stringo u)))
 
-;; The always-succeed leaf (used by staging base cases): TOP.
-(define rsucceed/d g-top)
+;; The always-succeed leaf (used by non-recursive helper base cases): TOP.
+(define succeed/d g-top)
 ;; The always-fail leaf: an honest failing primitive (goal returns #f on every
 ;; state), so settle-prim refutes.
-(define rfail/d (make-g-prim 'fail '() (lambda (st) #f)))
+(define fail/d (make-g-prim 'fail '() (lambda (st) #f)))
 
-;; rfresh/d: allocate fresh vars (at build/expansion time) and return a conj.
+;; fresh/d: allocate fresh vars (at build/expansion time) and return a conj.
 ;; No runtime fresh node; binders exist only in source.
-(define-syntax rfresh/d
+(define-syntax fresh/d
   (syntax-rules ()
     [(_ (x ...) g ...)
      (let ([x (var (new-scope))] ...)
        (make-g-conj (list g ...)))]))
 
-;; rconde/d: build a g-disj whose alternatives pair the guard conjunction with
+;; conde/d: build a g-disj whose alternatives pair the guard conjunction with
 ;; the body conjunction.  Clause shape ((x ...) (guard ...) (body ...)) -- the
 ;; per-repo 3-bracket convention.  Fresh clause vars are shared between guard
 ;; and body of the same clause.  The source label is computed at expansion time
 ;; (basename:line, like the closure conde/d) for the depth tally.
-(define-syntax (rconde/d stx)
+(define-syntax (conde/d stx)
   (syntax-case stx ()
     [(_ ((x ...) (g ...) (b ...)) ...)
      (let ()
@@ -319,7 +345,7 @@
                (if (>= (length loc) 2)
                    (string-append (basename path) ":" (number->string (cadr loc)))
                    (string-append (basename path) "@" (number->string bfp))))
-             "rconde/d?"))
+             "conde/d?"))
        #`(make-g-disj
           #,label
           (list (let ([x (var (new-scope))] ...)
@@ -356,17 +382,24 @@
                             (g-disj-alts g)))]
     [(g-call? g) (cons (g-call-name g) '(...))]
     [(g-blocked? g) (list 'blocked (residual->sexp (g-blocked-disj g)))]
+    [(g-tally? g) (list 'tally (g-tally-label g) (residual->sexp (g-tally-goal g)))]
     [else g]))
 
 ;; Assert the flatness invariants of a live residual (design note):
 ;;   TOP-free, ==-free, constraint-free, conj-free at top level;
-;;   only g-disj nodes appear as conjuncts.
+;;   only g-disj / g-blocked nodes appear as conjuncts (optionally under a
+;;   g-tally attribution wrapper, which is transparent to flatness).
+(define (flat-conjunct? c)
+  (or (g-disj? c)
+      (g-blocked? c)
+      (and (g-tally? c) (flat-conjunct? (g-tally-goal c)))))
+
 (define (assert-flat-residual! resid)
   (unless (g-conj? resid)
     (error 'assert-flat-residual! "residual is not a conj" resid))
   (for-each
    (lambda (c)
-     (unless (or (g-disj? c) (g-blocked? c))
+     (unless (flat-conjunct? c)
        (error 'assert-flat-residual! "non-disj conjunct in residual"
               (residual->sexp c))))
    (g-conj-goals resid)))

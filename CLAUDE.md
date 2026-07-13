@@ -27,7 +27,6 @@ lives at `.fmt.rkt` and teaches the formatter about this repo's forms:
 - `conde`, `conde/d` — each clause on its own line, and each clause's
   children (goals for `conde`, three sub-lists for `conde/d`) forced
   onto separate vertical lines aligned under the first child
-- `case-inf/d` — one head arg + clauses, like `case`
 - `lambda` — custom formatter: when the third element is `:`
   (the typed lambda used inside interpreter test programs), format as
   `(lambda (args) : type` + body-indent-2; otherwise the normal
@@ -36,7 +35,7 @@ lives at `.fmt.rkt` and teaches the formatter about this repo's forms:
 Reformat in place:
 
 ```
-raco fmt -i following.scm views.scm restricted-interp*.scm \
+raco fmt -i following.scm residual.scm views.scm restricted-interp*.scm \
            tests/*.scm synthesis/*.scm experiments/*.scm
 ```
 

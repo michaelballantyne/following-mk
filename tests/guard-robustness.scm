@@ -10,20 +10,28 @@
 ;;
 ;; Two /d relations used throughout as guard bodies:
 ;;   - diverge/d: a conde/d whose sole clause's guard recursively calls
-;;     itself with no base case. Each recursive call re-enters
-;;     conde/d-runtime, consuming one tick of suspend-depth budget, so it
+;;     itself with no base case. Each recursive call re-enters settle-disj,
+;;     consuming one tick of suspend-depth budget, so it
 ;;     is guaranteed to hard-suspend once suspend-depth exceeds
 ;;     *suspend-depth* (default 20). Models an unboundedly-recursive guard.
-;;   - fail/d: a guard that always fails cleanly via a contradictory
-;;     fresh unification (y = 1 and y = 2 in the same clause).
+;;   - fail-cleanly/d: a guard that always fails cleanly via a contradictory
+;;     fresh unification (y = 1 and y = 2 in the same clause).  Named
+;;     distinctly from residual.scm's canonical `fail/d` primitive (the
+;;     always-fail g-prim leaf) so this file's local helper doesn't clobber
+;;     that global binding -- Chez top-level `define` rebinds, it doesn't
+;;     lexically shadow, so a same-named local `define` here would silently
+;;     replace the canonical value for every file loaded afterward.
 
-(define (diverge/d)
+;; diverge/d recurses through a sole-survivor conde/d with no base case, so it
+;; MUST be a define-relation/d (a plain define with a self-reference loops at
+;; construction time under the residual engine's eager expansion).
+(define-relation/d (diverge/d)
   (conde/d
     ([]
      [(diverge/d)]
      [])))
 
-(define (fail/d)
+(define (fail-cleanly/d)
   (fresh/d (y)
     (==/d y 1)
     (==/d y 2)))
@@ -43,7 +51,7 @@
                        [(diverge/d)]
                        [(==/d q 'A)])
                       ([]
-                       [(fail/d)]
+                       [(fail-cleanly/d)]
                        [(==/d q 'B)]))))])
     (list result (> *suspend-depth-cutoff-counter* 0)))
   '((A) #t))
@@ -79,19 +87,19 @@
 ;; documented classification). A naive reading of "multi-answer ->
 ;; 'nondet -> stall" would predict the *outer* conde/d also stalls here.
 ;;
-;; It does not. conde/d-runtime only compares clauses by whether each
-;; clause's guard-stream is #f (ruled out) or truthy (a candidate); it
-;; never inspects *why* a truthy guard-stream is shaped like a
-;; suspend pair. `(nondeterministic)` for the inner conde/d returns
-;; `(cons st g-thunk)` -- structurally identical to an ordinary
-;; soft-suspend `(c . f)`. With only one outer clause, there is no
-;; second candidate to trigger cross-clause `(nondeterministic)`, so the
-;; outer clause commits immediately: the body runs on the (unmodified)
-;; entry state, and the unresolved inner ambiguity is carried forward as
-;; a perpetually-retried soft-suspended follower goal.
+;; It does not. settle-disj's loop only compares alternatives by whether
+;; settling the guard returns #f (ruled out) or a truthy result (a
+;; candidate); it never inspects *why* a truthy result is a full success
+;; (g-top) versus itself a genuine residual/stall -- both count as "this
+;; alt applies" for the >=2-live-alts stall test. With only one outer
+;; clause there is no second candidate to trigger that stall, so the outer
+;; clause commits immediately (`found` and no more `alts`): the body settles
+;; on the guard's own (unmodified-store) state, and the unresolved inner
+;; ambiguity is carried forward spliced into the residual as a
+;; perpetually-retried soft-suspended follower goal.
 ;;
 ;; Net effect actually observed: q = 'A is committed and visible outside
-;; on the very first trigger, exactly like a hard-suspended sole-survivor
+;; on the very first trigger, exactly like a budget-blocked sole-survivor
 ;; guard (case 1) -- soft (nondet) and hard (depth-limit) guard
 ;; suspensions get the same "commit now, keep chewing on the residual
 ;; later" treatment when there is no sibling to compare against. This
@@ -184,7 +192,7 @@
 ;;
 ;; Positive control for the extension-commitment design point in
 ;; design.md: clause A's guard binds y = 'guard-extended (a variable the
-;; body never touches); clause B's guard fails cleanly (fail/d). A is
+;; body never touches); clause B's guard fails cleanly (fail-cleanly/d). A is
 ;; the sole survivor with no ambiguity at all, so it commits normally,
 ;; and the guard's own extension (y) travels out to the outer store
 ;; alongside the body's extension (q).
@@ -197,7 +205,7 @@
                          [(==/d y 'guard-extended)]
                          [(==/d q 'A)])
                         ([]
-                         [(fail/d)]
+                         [(fail-cleanly/d)]
                          [(==/d q 'B)])))))])
     (list result (> *singleton-succeed-counter* 0)))
   '(((A guard-extended)) #t))
@@ -229,3 +237,80 @@
                     (== x 1)))])
     (list result (> *singleton-succeed-counter* 0) (> *non-singleton-succeed-counter* 0)))
   '((A) #t #t))
+
+;;; ----------------------------------------------------------------
+;;; Follower decision vector helper (was in the deleted differential
+;;; tests/residual-decisions.scm; the two tests below still use it).
+;;; ----------------------------------------------------------------
+
+(define (follower-decision-vector)
+  (list *fail-counter*
+        *singleton-succeed-counter*
+        *non-singleton-succeed-counter*
+        *suspend-depth-cutoff-counter*))
+
+;; Run a thunk (a full `run`, which resets counters at entry) and read back the
+;; decision vector it produced.
+(define (decisions-of thunk)
+  (thunk)
+  (follower-decision-vector))
+
+;;; ----------------------------------------------------------------
+;;; Dead-alternative pruning (present-day behavior of the engine).
+;;;
+;;; A 3-alt disj where alt A's guard fails only AFTER budget-blocking work
+;;; (diverge, then y = 1 and y = 2), and alts B/C stall on an outer var x the
+;;; main search grounds later.  The engine prunes A out of the stalled disj on
+;;; the first pass (sound: guard failure is monotone in the growing store), so
+;;; A's dead guard is NOT re-verified on the retrigger -- its suspend-depth
+;;; cutoff is paid once, not twice.  (Was a residual-vs-closure differential;
+;;; now a single-engine property, with the vector hard-coded so any future
+;;; shift flags loudly.)  Vector = (fail singleton suspend suspend-cutoff).
+;;; ----------------------------------------------------------------
+
+(test "pruning skips dead-guard re-verification (cutoff paid once)"
+  (decisions-of
+   (lambda ()
+     (run 1 (q)
+       (fresh (x)
+         (follower (list q x)
+           (conde/d
+             ([y] [(diverge/d) (==/d y 1) (==/d y 2)] [(==/d q 'A)])
+             ([] [(==/d x 1)] [(==/d q 'B)])
+             ([] [(==/d x 2)] [(==/d q 'C)])))
+         (== x 1)))))
+  '(0 1 1 1))
+
+;;; ----------------------------------------------------------------
+;;; tally/d + g-tally: finding-1 regression.
+;;;
+;;; A diverging guard wrapped in (tally/d ...) must budget-block a BOUNDED
+;;; number of times -- exactly as the unwrapped case -- NOT re-sweep
+;;; exponentially inside the tally wrapper.  settle-tally wraps each surviving
+;;; conjunct individually so a budget-blocked child stays HARD (partition-
+;;; blocked's tally-blocked? sees through the wrapper); a naive whole-pool
+;;; wrapper would read as one opaque soft node and re-expand its hidden
+;;; g-blocked child on every store change (finding 1, relocated).  We assert
+;;; the wrapped result matches the unwrapped case AND the two suspend-cutoff
+;;; counts are equal (so wrapping added no re-sweeps).  Would have caught
+;;; finding 1 had tally/d existed then.
+;;; ----------------------------------------------------------------
+
+(test "tally/d-wrapped diverging guard: bounded cutoff matching the unwrapped case (finding-1 regression)"
+  (let* ([unwrapped (run 1 (q)
+                      (follower q
+                        (conde/d
+                          ([] [(diverge/d)] [(==/d q 'A)])
+                          ([] [(fail-cleanly/d)] [(==/d q 'B)]))))]
+         [unwrapped-cutoff *suspend-depth-cutoff-counter*]
+         [wrapped (run 1 (q)
+                    (follower q
+                      (conde/d
+                        ([] [(tally/d 'DIV (diverge/d))] [(==/d q 'A)])
+                        ([] [(fail-cleanly/d)] [(==/d q 'B)]))))]
+         [wrapped-cutoff *suspend-depth-cutoff-counter*])
+    (list unwrapped
+          wrapped
+          (> unwrapped-cutoff 0)
+          (= unwrapped-cutoff wrapped-cutoff)))
+  '((A) (A) #t #t))

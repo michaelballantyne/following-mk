@@ -173,15 +173,15 @@
 ;;; Arm B pieces: the /d constraint network for the follower.
 ;;; =====================================================================
 
-;; conj/d-list: conjoin a runtime list of /d goals (mirrors conj/d* but
-;; for a list).  conj/d-run is defined in following.scm.
-(define (conj/d-list gs)
-  (lambda (unsound-fail-depth)
-    (lambda (suspend-depth)
-      (lambda (st)
-        (conj/d-run suspend-depth
-                    (map (lambda (g) ((g unsound-fail-depth) suspend-depth)) gs)
-                    st '() '())))))
+;; conj/d-list: conjoin a runtime list of /d goals.  Needed because the peer
+;; list's length depends on N (a runtime value), so the goals can't be spliced
+;; into a fixed conde/d/fresh/d clause at macro-expansion time.  Under the
+;; residual engine this is direct: a g-conj's `goals` field is already a
+;; (Scheme) list, so conjoining a runtime list of residual goals is just
+;; wrapping them in one -- no special runtime-conjoin combinator needed
+;; (the closure engine needed conj/d-run here because its goal was an opaque
+;; curried function combinable only through that specific runtime protocol).
+(define (conj/d-list gs) (make-g-conj gs))
 
 ;; all-diff/d v peers: post (=/=/d p v) for each peer p.
 (define (all-diff/d v peers)

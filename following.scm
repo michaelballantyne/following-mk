@@ -36,16 +36,10 @@
 
 ;;; --- depth parameters
 ;;;
-;;; *unsound-fail-depth*: UNSOUND cutoff.  When exceeded, the
-;;; follower fails outright.  Intended as a diagnostic knob so that a
-;;; diverging branch can be starved out of faster-mk's interleaving scheduler,
-;;; making pruning on the surviving branch observable.  NOT a real optimization.
-;;;
-;;; *suspend-depth*: sound cutoff.  When exceeded, the follower
-;;; suspends (returns the entry state paired with a resume thunk), the same
-;;; recovery used if the work were genuinely incomplete.
-
-(define *unsound-fail-depth* (make-parameter +inf.0))
+;;; *suspend-depth*: sound cutoff.  When exceeded, a blocked conde/d (g-disj)
+;;; is left budget-blocked (g-blocked) in the residual instead of being
+;;; expanded further -- the same recovery used if the work were genuinely
+;;; incomplete.  Depth resets to 0 at each top-level follower trigger.
 
 (define *suspend-depth* (make-parameter 20))
 
@@ -55,9 +49,8 @@
 ;;; *main-unsound-depth*: UNSOUND cutoff on the main search.  Each
 ;;; patched `conde` in mk.scm increments the main-search depth counter
 ;;; `state-D`; when D exceeds this limit, the branch fails outright.
-;;; Parallel to `*unsound-fail-depth*` for the follower; same caveat
-;;; (not an optimization, a diagnostic knob for starving diverging
-;;; branches).  Default +inf.0 (disabled).
+;;; A diagnostic knob for starving diverging branches on the MAIN search
+;;; (not an optimization).  Default +inf.0 (disabled).
 ;;;
 ;;; *check-follower-every*: throttle on how often the follower is
 ;;; fired from the main search's conde hook.  `state-FC` counts conde
@@ -107,7 +100,6 @@
 
 ;;; --- counters (cheap instrumentation; print at end of run)
 
-(define *unsound-fail-depth-cutoff-counter* 0)
 (define *suspend-depth-cutoff-counter* 0)
 (define *main-unsound-depth-cutoff-counter* 0)
 ;; Main-search branches cut because the watched term's size lower bound
@@ -118,8 +110,8 @@
 ;; Main-search conde expansions: bumped once per invocation of the closure
 ;; returned by main-conde-hook (once per main-search conde entry).
 (define *main-conde-counter* 0)
-;; Follower conde/d entries: bumped once per evaluation attempt in
-;; conde/d-runtime (once per state that reaches the clause loop).
+;; Follower conde/d entries: bumped once per conde/d (g-disj) evaluation in
+;; settle-disj (once per non-budget-blocked disj settle).
 (define *conde/d-counter* 0)
 (define *fail-counter* 0)
 (define *singleton-succeed-counter* 0)
@@ -144,7 +136,7 @@
 ;;; Each conde/d call site carries a source label (see the conde/d macro).
 ;;; Three tables keyed by that label let us attribute suspend-depth cutoffs
 ;;; to the specific /d relation that drives the deep unfolding:
-;;;   *entries-by-label*  -- every conde/d-runtime evaluation attempt
+;;;   *entries-by-label*  -- every conde/d (g-disj) settle-disj evaluation
 ;;;   *cutoffs-by-label*  -- every suspend-depth cutoff fired at that site
 ;;;   *maxdepth-by-label* -- max suspend-depth observed at entry to that site
 ;;; Nothing prints unless print-depth-tally! is called explicitly.
@@ -203,7 +195,6 @@
                     rows)))))
 
 (define (reset-counters!)
-  (set! *unsound-fail-depth-cutoff-counter* 0)
   (set! *suspend-depth-cutoff-counter* 0)
   (set! *main-unsound-depth-cutoff-counter* 0)
   (set! *size-cutoff-counter* 0)
@@ -262,9 +253,6 @@
         (cons "trigger unproductive"
               (lambda ()
                 *externally-unproductive-trigger-counter*))
-        (cons "cutoff: unsound fail"
-              (lambda ()
-                *unsound-fail-depth-cutoff-counter*))
         (cons "cutoff: suspend"
               (lambda ()
                 *suspend-depth-cutoff-counter*))
@@ -307,7 +295,6 @@
           (list
            (let ([v (*suspend-depth*)]) (and (not (= v 20)) (format "suspend-depth=~a" v)))
            (let ([v (*check-follower-every*)]) (and (not (= v 1)) (format "check-every=~a" v)))
-           (let ([v (*unsound-fail-depth*)]) (and (not (= v +inf.0)) (format "unsound-fail=~a" v)))
            (let ([v (*main-unsound-depth*)]) (and (not (= v +inf.0)) (format "main-unsound=~a" v)))
            (let ([v (*max-term-size*)]) (and (not (= v +inf.0)) (format "max-term-size=~a" v)))
            (and (*print-follower-term*) "print-follower")))])
@@ -411,9 +398,10 @@
 ;;; productivity measurement (walk* term before vs after each trigger)
 ;;; and for `*print-follower-term*` tracing.
 
+;; `g` is a residual goal node (see residual.scm); state-F holds (goal . term).
 (define (follower-aux t g)
   (lambda (st)
-    (run-and-set-follower (cons (g 0) t) st)))
+    (run-and-set-follower (cons g t) st)))
 
 (define-syntax follower
   (syntax-rules ()
@@ -422,279 +410,13 @@
            [g ge])
        (follower-aux t g))]))
 
-;;; --- stream / state shape for conde/d
-;;; inf/d is a conde/d-style stream: either #f (failure), a state (singleton
-;;; success), or (state . resume-thunk) (singleton success with remainder).
-
-(define (state? v)
-  (and (list? v) (= (length v) 5)))
-
-(define-record-type hard-suspended (fields state thunk))
-
-(define (inf/d? v)
-  (or (not v) (hard-suspended? v) (and (pair? v) (state? (car v)) (procedure? (cdr v))) (state? v)))
-
-(define-syntax case-inf/d
-  (syntax-rules ()
-    [(_ e (() e0) ((c^) e1) ((c f) e2) ((ch fh) e3))
-     (let ([stream e])
-       (cond
-         [(not stream) e0]
-         [(hard-suspended? stream)
-          (let ([ch (hard-suspended-state stream)]
-                [fh (hard-suspended-thunk stream)])
-            e3)]
-         [(not (and (pair? stream) (procedure? (cdr stream)))) (let ([c^ stream]) e1)]
-         [else
-          (let ([c (car stream)]
-                [f (cdr stream)])
-            e2)]))]))
-
-;;; --- the two depth checks
-
-;; Unsoundly fail when reaching *unsound-fail-depth*.
-(define (check-unsound-fail-depth g)
-  (lambda (unsound-fail-depth)
-    (check-type unsound-fail-depth number?)
-    (lambda (suspend-depth)
-      (check-type suspend-depth number?)
-      (lambda (st)
-        (check-type st state?)
-        (if (> unsound-fail-depth (*unsound-fail-depth*))
-            (begin
-              (increment-counter! *unsound-fail-depth-cutoff-counter*)
-              #f) ;; UNSOUND!
-            (((g (+ unsound-fail-depth 1)) suspend-depth) st))))))
-
-;; Soundly suspend when reaching *suspend-depth*.
-(define (check-suspend-depth label g-on-fallback-thunk g)
-  (lambda (suspend-depth)
-    (check-type suspend-depth number?)
-    (lambda (st)
-      (check-type st state?)
-      (if (> suspend-depth (*suspend-depth*))
-          (begin
-            (increment-counter! *suspend-depth-cutoff-counter*)
-            (record-depth-cutoff! label)
-            (make-hard-suspended st (g-on-fallback-thunk)))
-          ((g (+ suspend-depth 1)) st)))))
-
-;;; --- conde/d: committing conde
-
-(define-syntax (conde/d
-                 stx)
-  (syntax-case stx ()
-    [(_ ((x ...) (g ...) (b ...)) ...)
-     (let ()
-       ;; Source label for this call site, computed at expansion time and
-       ;; embedded as a literal string.  Prefer the syntax annotation
-       ;; ("basename:line"); if absent, fall back to the leading operator
-       ;; symbols of the first clause's guards.
-       (define (basename p)
-         (let loop ([i (- (string-length p) 1)])
-           (cond
-             [(< i 0) p]
-             [(char=? (string-ref p i) #\/) (substring p (+ i 1) (string-length p))]
-             [else (loop (- i 1))])))
-       (define (fallback-label)
-         (let* ([clauses (syntax->datum #'((g ...) ...))]
-                [first-clause (if (null? clauses) '() (car clauses))]
-                [ops (map (lambda (form) (if (pair? form) (car form) form)) first-clause)])
-           (string-append "conde/d?["
-                          (if (null? ops)
-                              ""
-                              (fold-left (lambda (acc s) (string-append acc "," (format "~a" s)))
-                                         (format "~a" (car ops))
-                                         (cdr ops)))
-                          "]")))
-       (define ann (syntax->annotation stx))
-       (define label
-         (if ann
-             (let* ([src (annotation-source ann)]
-                    [sfd (source-object-sfd src)]
-                    [path (source-file-descriptor-path sfd)]
-                    [bfp (source-object-bfp src)]
-                    [loc (call-with-values (lambda () (locate-source sfd bfp #t)) list)])
-               (if (>= (length loc) 2)
-                   (string-append (basename path) ":" (number->string (cadr loc)))
-                   (string-append (basename path) "@" (number->string bfp))))
-             (fallback-label)))
-       #`(check-unsound-fail-depth
-          (lambda (unsound-fail-depth)
-            (check-type unsound-fail-depth number?)
-            (letrec ([conde/d-g
-                      (conde/d-runtime
-                       #,label
-                       (list (lambda (suspend-depth)
-                             (check-type suspend-depth number?)
-                             (lambda (st)
-                               (check-type st state?)
-                               (let ([scope (subst-scope (state-S st))])
-                                 (let ([x (var scope)] ...)
-                                   (cons ((((conj/d* g ...) unsound-fail-depth) suspend-depth) st)
-                                         (lambda (suspend-depth)
-                                           (check-type suspend-depth number?)
-                                           (lambda (st)
-                                             ((((conj/d* b ...) unsound-fail-depth) suspend-depth)
-                                              st)))))))) ...)
-                     (lambda ()
-                       conde/d-g))])
-              conde/d-g))))]))
-
-(define (conde/d-runtime label clauses g-thunk)
-  (check-suspend-depth
-   label
-   g-thunk
-   (lambda (suspend-depth)
-     (check-type suspend-depth number?)
-     (lambda (st)
-       (define (nondeterministic)
-         (check-type (cons st (g-thunk)) inf/d?))
-       (increment-counter! *conde/d-counter*)
-       (record-depth-entry! label suspend-depth)
-       (check-type st state?)
-       (let ([st (state-with-scope st (new-scope))]) ;; for set-var-val at choice point entry
-         (let loop ([clauses clauses]
-                    [previously-found-clause #f])
-           (if (null? clauses)
-               (and previously-found-clause
-                    (let ([guard-stream (car previously-found-clause)]
-                          [body (cdr previously-found-clause)])
-                      ;; commit, evaluate body
-                      (case-inf/d guard-stream
-                        [() #f]
-                        [(c) (conj/d-run suspend-depth (list (body suspend-depth)) c '() '())]
-                        [(c f) (conj/d-run suspend-depth (list (body suspend-depth)) c (list f) '())]
-                        [(ch fh)
-                         (conj/d-run suspend-depth (list (body suspend-depth)) ch '() (list fh))])))
-               (let* ([clause-evaluated (((car clauses) suspend-depth) st)]
-                      [guard-stream (car clause-evaluated)]
-                      [body-g (cdr clause-evaluated)])
-                 (cond
-                   [(not guard-stream) (loop (cdr clauses) previously-found-clause)]
-                   [else
-                    (if previously-found-clause
-                        (nondeterministic)
-                        (loop (cdr clauses) (cons guard-stream body-g)))])))))))))
-
-;;; --- conjunction / depth-threaded goal primitives
-
-;;; conj/d-run: worklist-based conjunction runner.
-;;; Takes a suspend-depth, a list of goals [(st -> inf/d) ...], and
-;;; a state. Processes each goal, collecting results into soft-suspended
-;;; (can retry with new info) and hard-suspended (deferred to retrigger)
-;;; worklists. Iterates on soft-suspended goals while progress is made.
-
-(define (conj/d-run suspend-depth goals st soft hard)
-  (let ([entry-C (state-C st)]
-        [entry-M (subst-map (state-S st))])
-    (let process ([goals goals]
-                  [st st]
-                  [soft soft]
-                  [hard hard])
-      (if (null? goals)
-          ;; Round complete.
-          (let ([changed? (or (not (eq? entry-C (state-C st)))
-                              (not (eq? entry-M (subst-map (state-S st)))))])
-            (cond
-              [(and (null? soft) (null? hard)) st]
-              [(and (not (null? soft)) changed?)
-               ;; Progress was made — iterate on soft-suspended goals.
-               (conj/d-run suspend-depth
-                           (map (lambda (f)
-                                  (f suspend-depth))
-                                (reverse soft))
-                           st
-                           '()
-                           hard)]
-              [else
-               ;; No more progress. Build result from remaining goals.
-               (let ([resume (conj/d-resume (reverse soft) hard)])
-                 (if (null? hard)
-                     (cons st resume)
-                     (make-hard-suspended st resume)))]))
-          ;; Process next goal.
-          (let ([result ((car goals) st)])
-            (case-inf/d result
-              [() #f]
-              [(c) (process (cdr goals) c soft hard)]
-              [(c f) (process (cdr goals) c (cons f soft) hard)]
-              [(ch fh) (process (cdr goals) ch soft (cons fh hard))]))))))
-
-(define (conj/d-resume soft hard)
-  (let ([all (append soft hard)])
-    (lambda (sd)
-      (lambda (st)
-        (conj/d-run sd
-                    (map (lambda (f)
-                           (f sd))
-                         all)
-                    st
-                    '()
-                    '())))))
-
-(define succeed/d
-  (lambda (unsound-fail-depth)
-    (lambda (suspend-depth)
-      (lambda (st)
-        st))))
-
-(define-syntax conj/d*
-  (syntax-rules ()
-    [(_) succeed/d]
-    [(_ g0) g0]
-    [(_ g0 g1 g* ...)
-     (let ([gs (list g0 g1 g* ...)])
-       (lambda (unsound-fail-depth)
-         (lambda (suspend-depth)
-           (lambda (st)
-             (conj/d-run suspend-depth
-                         (map (lambda (g)
-                                ((g unsound-fail-depth) suspend-depth))
-                              gs)
-                         st
-                         '()
-                         '())))))]))
-
-(define-syntax fresh/d
-  (syntax-rules ()
-    [(_ (x ...) g0 g ...)
-     (lambda (unsound-fail-depth)
-       (check-type unsound-fail-depth number?)
-       (lambda (suspend-depth)
-         (check-type suspend-depth number?)
-         (lambda (st)
-           (let ([scope (subst-scope (state-S st))])
-             (let ([x (var scope)] ...)
-               ((((conj/d* g0 g ...) unsound-fail-depth) suspend-depth) st))))))]))
-
-;;; --- depth-threading wrappers for the primitive goal constructors used
-;;; inside conde/d / fresh/d.  Each /d variant takes the same args as its base
-;;; but returns a goal that accepts (unsound-fail-depth)(suspend-depth)(st)
-;;; thunks.
-
-(define (wrap-for-depth-limit gc)
-  (lambda args
-    (let ([g (apply gc args)])
-      (lambda (unsound-fail-depth)
-        (check-type unsound-fail-depth number?)
-        (lambda (suspend-depth)
-          (check-type suspend-depth number?)
-          g)))))
-
-;; A counted == variant used as the base for ==/d, so we can tell unifications
-;; inside follower evaluation apart from main-search ones in the counters.
+;; A counted == variant used as the base for the residual == leaf (==/d in
+;; residual.scm), so we can tell unifications inside follower evaluation apart
+;; from main-search ones in the counters.
 (define (==-counted u v)
   (lambda (st)
     (increment-counter! *==/d-counter*)
     ((==-base u v) st)))
-
-(define ==/d (wrap-for-depth-limit ==-counted))
-(define =/=/d (wrap-for-depth-limit =/=))
-(define absento/d (wrap-for-depth-limit absento))
-(define symbolo/d (wrap-for-depth-limit symbolo))
-(define numbero/d (wrap-for-depth-limit numbero))
-(define stringo/d (wrap-for-depth-limit stringo))
 
 ;;; --- main-conde hook
 ;;;
@@ -773,38 +495,38 @@
             (run-and-set-follower F st))
           st))))
 
+;; state-F holds (residual-goal . term) -- a plain data Goal node (see
+;; residual.scm), not a curried closure.  `settle` returns #f (refuted),
+;; (cons TOP st) (fully-determinate success), or (cons residual st)
+;; (suspended, residual a flat conj of blocked disjuncts).  Each trigger
+;; re-settles from depth 0 (matching the old top-level re-fire semantics).
 (define (run-and-set-follower F st)
   (let ([g (car F)]
         [t (cdr F)]
         [before-reified (reify-for-tally (cdr F) st)])
-    ;; Mark unifications performed during the follower goal invocation (and
-    ;; the case-inf/d dispatch over its result) as follower work, so mk.scm's
-    ;; unify counter attributes them to *follower-unify-counter*. The follower
-    ;; search commits deterministically and does not escape non-locally, so a
-    ;; plain set!/restore is sufficient (no dynamic-wind needed).
+    ;; Mark unifications performed during the settle (and the reify probes
+    ;; around it) as follower work, so mk.scm's unify counter attributes them
+    ;; to *follower-unify-counter*. The follower search commits
+    ;; deterministically and does not escape non-locally, so a plain
+    ;; set!/restore is sufficient (no dynamic-wind needed).
     (set! *in-follower-eval?* #t)
     (let ([result
-           (let ([$ ((g 0) (state-with-scope st (new-scope)))])
-             (case-inf/d $
-               [()
-                (begin
-                  (increment-counter! *fail-counter*)
-                  #f)]
-               [(c^)
-                (begin
-                  (increment-counter! *singleton-succeed-counter*)
-                  (tally-productivity! before-reified t c^)
-                  (state-with-F c^ #f))]
-               [(c^ f^)
-                (begin
-                  (increment-counter! *non-singleton-succeed-counter*)
-                  (tally-productivity! before-reified t c^)
-                  (state-with-F c^ (cons f^ t)))]
-               [(ch fh)
-                (begin
-                  (increment-counter! *non-singleton-succeed-counter*)
-                  (tally-productivity! before-reified t ch)
-                  (state-with-F ch (cons fh t)))]))])
+           (let ([r (settle g (state-with-scope st (new-scope)) 0)])
+             (cond
+               [(not r)
+                (increment-counter! *fail-counter*)
+                #f]
+               [(g-top? (car r))
+                (increment-counter! *singleton-succeed-counter*)
+                (tally-productivity! before-reified t (cdr r))
+                (state-with-F (cdr r) #f)]
+               [else
+                (increment-counter! *non-singleton-succeed-counter*)
+                (tally-productivity! before-reified t (cdr r))
+                ;; Flatness invariant, checked at the one place every live
+                ;; residual passes through (the residual/follower boundary).
+                (assert-flat-residual! (car r))
+                (state-with-F (cdr r) (cons (car r) t))]))])
       (set! *in-follower-eval?* #f)
       result)))
 
@@ -840,76 +562,19 @@
 
 ;;; --- per-view attribution tally (tally/d)
 ;;;
-;;; (tally/d label goal) wraps a /d goal TRANSPARENTLY -- identical search
-;;; behavior -- while attributing two per-label events to `label` (a symbol
-;;; such as 'R1, 'TY, 'EX):
+;;; The tally/d COMBINATOR itself (a g-tally residual node, plus settle-tally
+;;; and the partition-blocked extension that keeps its blocked children hard)
+;;; lives in residual.scm; see there for the refute/force/stall semantics and
+;;; the documented blind spots.  What stays HERE is the engine-agnostic
+;;; per-label bookkeeping settle-tally calls into: the *view-tally-alist* and
+;;; its ref/reset/bump/store-changed helpers, and print-view-tallies.
 ;;;
-;;;   refute -- an evaluation step of the wrapped goal FAILS (returns #f),
-;;;             which fails the follower conjunction on this branch.
-;;;   force  -- an evaluation step COMMITS a store change: the result state's
-;;;             substitution map OR constraint store is not eq? to the entry
-;;;             state's, i.e. a binding or a constraint was added.
-;;;
-;;; "Evaluation step" covers BOTH the initial evaluation at follower
-;;; installation AND every RE-FIRE of a stalled view at later trigger points:
-;;; when a step suspends (soft `(st . thunk)` or hard-suspended), tally/d
-;;; REBUILDS the suspension with its resume thunk re-wrapped under the same
-;;; label, so the label rides inside the worklist items conj/d-run stashes
-;;; (soft and hard) and inside the follower resume stored in state-F.  The
-;;; label is captured in the wrapper closure at item-creation time -- no
-;;; dynamic extent is relied on across the suspension boundary -- and each
-;;; resumed step re-wraps ITS OWN suspensions, so the chain survives any
-;;; number of stall/resume rounds and conj/d-resume repackagings.  (This
-;;; matters: nearly all view activity -- the refutes and forces -- happens on
-;;; resumption, not at installation; an initial-evaluation-only tally sees one
-;;; 'force per example goal and nothing else.)  Goals not wrapped in tally/d
-;;; put unlabeled thunks in the same worklists and count nothing.  Children
-;;; spawned inside the wrapped goal (fresh/d, nested conde/d bodies) are part
-;;; of its evaluation step; the only thing that escapes to the enclosing
-;;; worklist is the suspension thunk, which carries the label.
-;;;
-;;; The force test is exactly conj/d-run's `changed?` fixpoint test: an
-;;; identity comparison on (subst-map (state-S st)) and (state-C st).  It is
-;;; CHEAP and UNIFY-FREE (only car/cdr accessors, no walk, no reify), so
-;;; tally/d needs no `without-unify-counting` guard and adds near-zero
-;;; unify(main)/unify(follower) -- contrast the reify-based productivity tally,
-;;; whose reify IS a hidden unify consumer.  Verified: bound-15
-;;; rember-full-id-views is byte-identical (unify-main / conde-main /
-;;; unify-follower) with all five views tally-wrapped vs untallied.
-;;;
-;;; Event counted for each of the four inf/d outcomes of one step:
-;;;   #f (fail)         -> refute++           (returned unchanged)
-;;;   state (singleton) -> force++ iff store changed vs entry
-;;;   (state . thunk)   -> force++ iff store changed vs entry;
-;;;                        thunk re-wrapped under the label
-;;;   hard-suspended    -> force++ iff store changed vs entry;
-;;;                        thunk re-wrapped under the label
-;;; A pure STALL step returns the ENTRY state unchanged -- conde/d's
-;;; `nondeterministic` yields (cons st thunk) with the same st, and a
-;;; suspend-depth cutoff yields (make-hard-suspended st ...) with the same st
-;;; -- so its store is eq? to entry and NEITHER counter moves.  That is the
-;;; intended three-way split: refute / force / (stall = neither).
-;;;
-;;; KNOWN BLIND SPOTS (consequences of the cheap store-identity choice):
-;;;   1. INTERNAL FRESH-VAR BINDINGS COUNT AS FORCE.  The set-var-val!
-;;;      optimization is disabled in mk.scm (subst-add always builds a fresh
-;;;      subst-map), so a view that merely ACCEPTS already-committed structure
-;;;      -- e.g. matching (==/d `(cons ,e1 ,e2) body) against a committed cons,
-;;;      binding the view's own fresh pattern vars e1,e2 -- changes subst-map
-;;;      identity and scores a "force" even though it did not narrow the outer
-;;;      term q.  So `force` means "committed and extended the store somehow",
-;;;      which over-counts relative to "forced a hole in q".  The reify-based
-;;;      aggregate *externally-productive-trigger-counter* is the term-level
-;;;      metric that excludes these; tally/d is the cheap per-view metric that
-;;;      does not.
-;;;   2. PER-STEP, NOT PER-DISTINCT-DECISION.  A view that stalls is
-;;;      re-evaluated at later triggers and within conj/d-run's fixpoint
-;;;      iterations; each evaluation step is counted afresh.  Counts are
-;;;      step frequencies, not counts of distinct candidate outcomes.
-;;;   3. SURVIVAL IS LOCAL.  A commit counted here may later be discarded by a
-;;;      subsequent conjunct in the follower failing.  "in a commit that
-;;;      survives" is therefore approximate: it survives the wrapped goal's
-;;;      step, not necessarily the whole follower branch.
+;;; refute -- a settle of the wrapped goal FAILS (#f).
+;;; force  -- a settle COMMITS a store change (subst-map OR constraint store
+;;;           not eq? to entry).  A pure STALL returns the entry state
+;;;           unchanged, so neither counter moves (three-way split:
+;;;           refute / force / stall=neither).  The store-identity test is
+;;;           cheap and unify-free.
 
 ;; label -> (refute-count . force-count).  Mutable cons cells, bumped in place;
 ;; reset (rebound to '()) by reset-counters! so no run leaks into a later one.
@@ -938,51 +603,6 @@
 (define (view-store-changed? st entry-M entry-C)
   (or (not (eq? entry-M (subst-map (state-S st))))
       (not (eq? entry-C (state-C st)))))
-
-;; One counted evaluation step: run `g` (an (st) -> inf/d) on `st`, bump the
-;; label's counters per the outcome, and re-wrap any suspension thunk so the
-;; NEXT step (a re-fire from a conj/d-run worklist or the state-F resume) is
-;; counted under the same label.
-(define (tally-step label g st)
-  (let ([entry-M (subst-map (state-S st))]
-        [entry-C (state-C st)])
-    (let ([result (g st)])
-      (case-inf/d result
-        [()
-         (begin
-           (view-tally-bump! label 'refute)
-           #f)]
-        [(c^)
-         (begin
-           (when (view-store-changed? c^ entry-M entry-C)
-             (view-tally-bump! label 'force))
-           c^)]
-        [(c f)
-         (begin
-           (when (view-store-changed? c entry-M entry-C)
-             (view-tally-bump! label 'force))
-           (cons c (tally-wrap-resume label f)))]
-        [(ch fh)
-         (begin
-           (when (view-store-changed? ch entry-M entry-C)
-             (view-tally-bump! label 'force))
-           (make-hard-suspended ch (tally-wrap-resume label fh)))]))))
-
-;; Wrap a resume thunk ((suspend-depth) -> (st) -> inf/d, the shape of both
-;; soft and hard worklist items) so its next step is a counted tally-step.
-(define (tally-wrap-resume label f)
-  (lambda (suspend-depth)
-    (let ([g (f suspend-depth)])
-      (lambda (st)
-        (tally-step label g st)))))
-
-(define (tally/d label goal)
-  (lambda (unsound-fail-depth)
-    (let ([g1 (goal unsound-fail-depth)])
-      (lambda (suspend-depth)
-        (let ([g2 (g1 suspend-depth)])
-          (lambda (st)
-            (tally-step label g2 st)))))))
 
 ;; Print the per-view tally (nothing when empty, so non-tallied runs are
 ;; unaffected).  Called from the `run` macro's report path, alongside

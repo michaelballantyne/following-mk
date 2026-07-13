@@ -5,7 +5,7 @@
 
 (define empty-env/d '())
 
-(define (not-in-envo/d x env)
+(define-relation/d (not-in-envo/d x env)
   (conde/d
     ([]
      [(==/d empty-env/d env)]
@@ -14,7 +14,7 @@
      [(==/d `((,y . ,b) . ,rest) env) (=/=/d y x)]
      [(not-in-envo/d x rest)])))
 
-(define (lookupo/d x env t type)
+(define-relation/d (lookupo/d x env t type)
   (fresh/d (y b rest)
     (==/d `((,y . ,b) . ,rest) env)
     (conde/d
@@ -31,7 +31,7 @@
        [(=/=/d x y)]
        [(lookupo/d x rest t type)]))))
 
-(define (list-of-symbolso/d los)
+(define-relation/d (list-of-symbolso/d los)
   (conde/d
     ([]
      [(==/d '() los)]
@@ -40,7 +40,7 @@
      [(==/d `(,a . ,d) los) (symbolo/d a)]
      [(list-of-symbolso/d d)])))
 
-(define (eval-listo/d expr env val type)
+(define-relation/d (eval-listo/d expr env val type)
   (conde/d
     ([]
      [(==/d '() expr) (==/d '() val)]
@@ -49,7 +49,7 @@
      [(==/d `(,a . ,d) expr) (==/d `(,v-a . ,v-d) val) (==/d `(,t-a . ,t-d) type)]
      [(eval-expo/d a env v-a 'I t-a) (eval-listo/d d env v-d t-d)])))
 
-(define (ext-env*o/d x* a* t* env out)
+(define-relation/d (ext-env*o/d x* a* t* env out)
   (conde/d
     ([]
      [(==/d '() x*) (==/d '() a*) (==/d env out)]
@@ -72,7 +72,7 @@
   (fresh/d (type)
     (eval-expo/d expr empty-env/d val 'I type)))
 
-(define (eval-expo/d expr env val EI type)
+(define-relation/d (eval-expo/d expr env val EI type)
   (conde/d
     ([]
      [(symbolo/d expr)]

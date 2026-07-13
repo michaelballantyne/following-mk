@@ -167,36 +167,47 @@ from search-cost claims.
   one-sided cutoff divergence, pinned by a hard-coded witness test), stamp
   fast path explicitly deferred to cutover. Suite 157 → 171.
 
-- [~] **3b. Cutover + delete the closure engine (steps 5–6).** FIRST HALF
-  DONE (2026-07-13, `...-073254-residual-engine-benchmark-parity.md`):
-  R1/R2/R2P/TY/NV and both interpreters (typed, untyped) ported to r-forms
-  (`residual-views.scm`, `residual-interp-following.scm`,
-  `residual-interp-untyped-following.scm`); suite 171→213, all green.
-  20 parallel benchmark arms (11 typed + 9 untyped+TY-default) run head to
-  head: **every completed comparison (19/20) produced byte-identical
-  answers**; the one exception (interleave, the sole no-termination-view
-  config) times out identically on both engines, twice each, at the same
-  bound — confirmed a real property of that arm, not a regression.
-  unify-main is consistently 2.4–11% higher on residual (never inverted,
-  every task) while unify-follower is consistently LOWER (sometimes ~half) —
-  read as the still-undeferred stamp fast path's absence (`residual.scm`
-  header says so explicitly), not a design flaw; falsifiable once stamps
-  land. `concluding-oro/d`/R2T remains unported (non-viable, backlog 3c).
-  `tally/d` has no residual port either (confirmed purely observational,
-  dropped in benchmark arms with no effect on counts/answers). Cutover bar
-  met: not a subtly-wrong port, a decision- and answer-equivalent one with a
-  bounded, explained overhead.
-  **STILL TO DO (second half, awaiting user go-ahead per their two-phase
-  request):** rename r→canonical, delete
-  `inf/d`/`case-inf/d`/`conj/d-run`/`conj/d-resume`/hard-suspended and the
-  closure-engine originals (`following.scm`'s conde/d machinery, `views.scm`,
-  the closure interpreters), re-baseline the synthesis benchmarks +
-  experiments (settle passes / expansions / commits / alt deaths / stamp
-  hits) with a bridging counter table. Then the explicit scheduler reads the
-  residual g-disj/g-blocked frontier directly (size/cost priority queue;
-  child ordering in g-conj = pluggable policy), recovering mk's implicit
-  heuristics explicitly. Protect the relational
-  substrate the views compose in, not the interleaving.
+- [x] **3b. Cutover + delete the closure engine (steps 5–6).** RESOLVED
+  2026-07-13. First half (`...-073254-residual-engine-benchmark-parity.md`):
+  R1/R2/R2P/TY/NV and both interpreters ported to r-forms, 20 parallel
+  benchmark arms run head to head against the closure engine — every
+  completed comparison (19/20) byte-identical, the one exception (interleave,
+  no-termination-view) timing out identically on both engines at the same
+  bound. Second half (`...-081155-cutover-design.md` design +
+  `...-090031-cutover-complete.md` execution + review): the closure engine is
+  DELETED. `inf/d`/`case-inf/d`/`conj/d-run`/`conj/d-resume`/hard-suspended/
+  `check-suspend-depth`/`check-unsound-fail-depth`/the closure `conde/d`/
+  `fresh/d` macros/the six curried primitive constructors are gone from
+  `following.scm`; `residual.scm`'s r-prefixed names took the canonical
+  names; `views.scm`/`restricted-interp-following.scm`/`restricted-interp-
+  untyped-following.scm` were edited IN PLACE (not swapped for their staging
+  counterparts, which would have silently dropped 28 of views.scm's 47
+  inline self-checks) — recursive relations converted to `define-relation/d`,
+  R2T's code removed (comments preserved as documentation). `tally/d` got its
+  first real residual design: a `g-tally` wrapper node, with a required,
+  non-obvious subtlety (wrap each surviving conjunct individually, not the
+  whole pool, or a budget-blocked child re-expands exponentially — the
+  finding-1 bug relocated); a dedicated regression test pins it. Suite
+  120→114 (down: 11 R2T self-checks removed; up: +2 pruning/tally regression,
+  +3 salvaged shape tests) — net honest, no coverage silently lost. Follower
+  now speaks `settle` directly; no more protocol-emulation shim.
+  Advisor review (independent of the executing agent) found and fixed three
+  more things before commit: a `fail/d` naming collision (a long-standing
+  local test helper in `guard-robustness.scm` was silently clobbering
+  residual.scm's new canonical `fail/d` primitive — renamed the local
+  helper), a stale comment describing deleted closure internals, and three
+  experiment files broken by the cutover but out of the original design's
+  scope (`latin-square.scm`, `negative-view-branch-vacuity.scm`: each had
+  exactly one closure-specific dependency plus, in the second case, a missed
+  `define-relation/d` conversion causing a construction-time infinite loop —
+  both fixed and verified running; `r2p-gates.scm`: its R2T-only gate family
+  removed, R2P gates kept; the four `*-full-id-views-r2t.scm` benchmark arms
+  deleted outright — irreparable, R2T is permanently gone, and their
+  conclusions are already recorded in prose). The explicit scheduler (next
+  natural step, not yet started) reads the residual g-disj/g-blocked frontier
+  directly (size/cost priority queue; child ordering in g-conj = pluggable
+  policy), recovering mk's implicit heuristics explicitly. Protect the
+  relational substrate the views compose in, not the interleaving.
 
 - [ ] **3c. (spawned, research) Does the R2T / 1b rescue fall out of settle?**
   Pre-registered in the design note and the new entry: recompute-with-fresh-
@@ -320,10 +331,14 @@ from search-cost claims.
 - Verify set-var-val! is genuinely disabled on the /d path (and the
   old-TODO question of removing it entirely — Will thinks it has
   negative ecosystem value; maybe upstream-first).
-- Remove `*unsound-fail-depth*`? Still unused. And with rungs 1+2,
-  `*main-unsound-depth*` never fires on the benchmark suite either
-  (depth-cut 0) — both unsound knobs are now candidates for demotion
-  to pure diagnostics or removal.
+- ~~Remove `*unsound-fail-depth*`?~~ RESOLVED at cutover (2026-07-13,
+  `...-090031-cutover-complete.md`): confirmed genuinely unused (`settle`
+  never threaded it, consistent with every differential test passing
+  regardless) and deleted along with the closure engine it belonged to.
+  `*main-unsound-depth*` (the separate leader/main-search knob) is
+  untouched by the cutover and still never fires on the benchmark suite
+  either (depth-cut 0) — still a candidate for demotion to pure
+  diagnostics or removal.
 - **Profit regime for bidirectionality (demoted from 2d).** 2b closed the
   efficiency case for property specs on functions with cheap forward
   examples. The reflection

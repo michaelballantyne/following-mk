@@ -3,8 +3,8 @@
 ;; attributes two per-label events: `refute` (the wrapped goal fails, #f) and
 ;; `force` (the wrapped goal commits a store change vs its entry state).  A
 ;; STALL commits nothing (returns the entry state unchanged), so it moves
-;; neither counter.  See the tally/d block in following.scm for the exact
-;; semantics and documented blind spots.
+;; neither counter.  See settle-tally in residual.scm for the exact semantics
+;; and the view-tally bookkeeping in following.scm.
 ;;
 ;; DEPENDS on views.scm already being loaded (for base-case-patho/d); in
 ;; test-all.scm this file is loaded after tests/untyped-interp.scm, which loads
@@ -97,9 +97,10 @@
       ((== q 5))))
   '((5 num)))
 
-;; 6. LABELS SURVIVE THE conj/d-run WORKLIST: two tallied views under fresh/d
-;;    both stall at installation; their wrapped thunks ride conj/d-run's soft
-;;    worklist through conj/d-resume into state-F.  On the refuting branch W1
+;; 6. LABELS SURVIVE SUSPENSION/RESUMPTION: two tallied views under fresh/d
+;;    both stall at installation; settle-tally re-wraps each surviving
+;;    conjunct under its own label, so the residual stored in state-F still
+;;    carries the labels.  On the refuting branch W1
 ;;    (processed first) refutes and the conjunction short-circuits, so W2 is
 ;;    never evaluated there; on the 'l branch both succeed without extending
 ;;    the store.  W1 -> (1 . 0), W2 -> (0 . 0), each under its OWN label.

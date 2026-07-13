@@ -61,6 +61,11 @@
                                             ; view-app-keywords,
                                             ; distinct-texto/d, and rungs 1-4a
 
+;; conj/d*: plain conjunction of already-built /d goals (used standalone the
+;; same way fresh/d uses it internally -- a residual g-conj's `goals` field is
+;; already a list, so this is just wrapping already-built goals in one).
+(define (conj/d* . gs) (make-g-conj gs))
+
 ;; ------------------------------------------------------------------
 ;; oro/d: plain two-way OR of two already-built /d goals, patho-oro/d style
 ;; (views.scm): both guards fail -> conde/d fails (REFUTE);
@@ -93,8 +98,15 @@
 
 ;; ------------------------------------------------------------------
 ;; AND over an argument/operand list (mirrors rands-non-vacuouso/d in tv4).
+;; Mutually recursive with non-vacuous-brancheso/d over an unbounded mk-term
+;; (the candidate body), so both MUST be define-relation/d: conde/d builds
+;; every clause body eagerly at construction time, so a plain define's
+;; self-reference here would unfold infinitely at construction, independent
+;; of whether the actual candidate is ground or holey (this is what the
+;; cutover converted throughout views.scm; this file's own local pair was out
+;; of that pass's scope and needs the same fix).
 ;; ------------------------------------------------------------------
-(define (rands-non-vacuous-brancheso/d rands)
+(define-relation/d (rands-non-vacuous-brancheso/d rands)
   (conde/d
     ([]
      [(==/d '() rands)]
@@ -107,7 +119,7 @@
 ;; the public relation: the whole-term walk (same clause structure as
 ;; non-vacuous-testso/d in views.scm).
 ;; ------------------------------------------------------------------
-(define (non-vacuous-brancheso/d body)
+(define-relation/d (non-vacuous-brancheso/d body)
   (conde/d
     ;; number literal -- no if-nodes
     ([]

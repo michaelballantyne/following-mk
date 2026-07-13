@@ -4,7 +4,6 @@
 # Usage: ./run.sh [FLAGS] TEST-FILE [TEST-FILE...]
 #
 # Flags (all optional; unset flags leave the following.scm defaults in place):
-#   --unsound-fail-depth N  set *unsound-fail-depth*     (follower, UNSOUND)
 #   --suspend-depth N       set *suspend-depth*          (follower, sound)
 #   --main-unsound-depth N  set *main-unsound-depth*     (main search, UNSOUND)
 #   --check-follower-every N set *check-follower-every*  (main search throttle)
@@ -23,7 +22,6 @@ if [[ -z $CHEZ ]]; then
   exit 1
 fi
 
-FAIL_DEPTH=
 SUSPEND_DEPTH=
 MAIN_DEPTH=
 CHECK_EVERY=
@@ -37,7 +35,6 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --unsound-fail-depth)    FAIL_DEPTH="$2"; shift 2 ;;
     --suspend-depth)         SUSPEND_DEPTH="$2"; shift 2 ;;
     --main-unsound-depth)    MAIN_DEPTH="$2"; shift 2 ;;
     --check-follower-every)  CHECK_EVERY="$2"; shift 2 ;;
@@ -62,7 +59,6 @@ trap 'rm -f "$tmp"' EXIT
   echo '(load "load.scm")'
   echo '(load "restricted-interp.scm")'
   echo '(load "restricted-interp-following.scm")'
-  [[ -n $FAIL_DEPTH ]]     && echo "(*unsound-fail-depth* $FAIL_DEPTH)"
   [[ -n $SUSPEND_DEPTH ]]  && echo "(*suspend-depth* $SUSPEND_DEPTH)"
   [[ -n $MAIN_DEPTH ]]     && echo "(*main-unsound-depth* $MAIN_DEPTH)"
   [[ -n $CHECK_EVERY ]]    && echo "(*check-follower-every* $CHECK_EVERY)"

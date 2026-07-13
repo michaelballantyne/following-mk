@@ -64,9 +64,4 @@
      (format-uniform-body/helper 0
        #:body-formatter format-conde-clause
        #:require-body? #f)]
-    ;; case-inf/d: 1 head arg (the stream), then clauses like `case`.
-    [("case-inf/d")
-     (format-uniform-body/helper 1
-       #:body-formatter (format-clause-2/indirect)
-       #:require-body? #f)]
     [else #f]))
