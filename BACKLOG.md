@@ -133,14 +133,17 @@ from search-cost claims.
   corners doc rather than chasing separately. Still open from the wave-2
   plan: rung-4b relevance ablation vs the untyped stack.
 
-- [ ] **3. First-order representation of the /d search, steps 1–2,
-  then the explicit scheduler on top. NOW THE TOP PRIORITY** (2026-07-13
-  reflection: search strategy over spec shape). Design note:
-  `claude/2026-07-12-200500-first-order-rep-design.md`. **Step-1
-  implementation map ready** (registry + per-site constructors, file:line
-  anchors, byte-identical-counter regression via tv2/tv3):
-  `claude/2026-07-13-042503-first-order-rep-step1-implementation-map.md` —
-  start there. Green-lit by
+- [~] **3. First-order representation of the /d search. STEP 1 DONE;
+  step 2 next. TOP PRIORITY** (2026-07-13 reflection: search strategy over
+  spec shape). Design note:
+  `claude/2026-07-12-200500-first-order-rep-design.md`; step-1 map
+  `claude/2026-07-13-042503-first-order-rep-step1-implementation-map.md`.
+  **Step 1 (conde/d site registry) implemented and validated
+  byte-identical** (`following.scm`; tv2 unify-main=2,615,131 unchanged,
+  120/120 tests; `...-043032-first-order-rep-step1-done.md`). **Step 2
+  next**: reify `conj/d-run`'s worklist into nodes + interpreter loop, same
+  byte-identical check; then store-version fast path (step 3) and the
+  explicit scheduler (step 4, where the wins are). Green-lit by
   Michael on conceptual-clarity grounds; memory-sharing half is
   measurement-enabling; speed half stays deprioritized; step 2's
   printable follower trees also upgrade the sampling loop. The

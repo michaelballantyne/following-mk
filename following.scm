@@ -171,6 +171,29 @@
   (hashtable-clear! *cutoffs-by-label*)
   (hashtable-clear! *maxdepth-by-label*))
 
+;;; --- First-order-rep registry (step 1) -------------------------------------
+;;; A static inventory of every conde/d call site, keyed by the SAME label the
+;;; depth-tally uses.  Populated by an idempotent, unify-free insert the first
+;;; time each conde/d form is evaluated, so it is behaviour-neutral: no counter
+;;; moves (proof obligation: tv2/tv3 dumps stay byte-identical).  The value is
+;;; the list of per-clause fresh-var (env-vector) arities; a fallback-label
+;;; collision with a DIFFERENT shape errors rather than silently overwriting.
+;;; This is the substrate the step-2 defunctionalized interpreter's
+;;; (disj site-label env) nodes will index.  Deliberately NOT cleared by
+;;; reset-depth-tally! — the site inventory is per-program, not per-run.  See
+;;; claude/2026-07-13-042503-first-order-rep-step1-implementation-map.md.
+(define *conde/d-registry* (make-hashtable string-hash string=?))
+
+(define (register-conde/d-site! label env-arities)
+  (let ([existing (hashtable-ref *conde/d-registry* label #f)])
+    (cond
+      [(not existing) (hashtable-set! *conde/d-registry* label env-arities)]
+      [(equal? existing env-arities) (void)]
+      [else
+       (error 'conde/d
+              "site-label collision with a different clause shape; give this conde/d a unique source location"
+              label existing env-arities)])))
+
 ;;; Print the per-site tally: every site that fired at least one suspend
 ;;; cutoff (sorted by cutoff count descending), plus the top ~10 sites by
 ;;; entry count.  Columns: label, entries, cutoffs, max-depth-at-entry.
@@ -519,7 +542,13 @@
                    (string-append (basename path) ":" (number->string (cadr loc)))
                    (string-append (basename path) "@" (number->string bfp))))
              (fallback-label)))
-       #`(check-unsound-fail-depth
+       ;; per-clause fresh-var (env-vector) arity, computed at expansion time.
+       (define env-arities
+         (map (lambda (xs) (length (syntax->list xs)))
+              (syntax->list #'((x ...) ...))))
+       #`(begin
+          (register-conde/d-site! #,label '#,(datum->syntax #'here env-arities))
+          (check-unsound-fail-depth
           (lambda (unsound-fail-depth)
             (check-type unsound-fail-depth number?)
             (letrec ([conde/d-g
@@ -539,7 +568,7 @@
                                               st)))))))) ...)
                      (lambda ()
                        conde/d-g))])
-              conde/d-g))))]))
+              conde/d-g)))))]))
 
 (define (conde/d-runtime label clauses g-thunk)
   (check-suspend-depth
