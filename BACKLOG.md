@@ -50,14 +50,16 @@ work**. All four explored same session; symbolic examples got folded
 into the wave-2 Now item, the other survey ideas (abstract-domain
 views, coverage) wait in Next.
 
-**Session handoff (2026-07-13):** Task 1 RESOLVED (R2P works, makes
-interleave feasible; naive combined view R2T diverges — structural
-negative; per-task measure selected;
-`...-040000-r2p-r2t-termination-generalization.md`). Task 2 wave-2 arms
-built + gated; measurement batch (rember-symbolic, swap-partial,
-rev-involution, symbolic-nofollower) in flight — read
-scratchpad/wave2-batch.log, then write the wave-2 results note and
-score the four predictions.
+**Session handoff (2026-07-13):** Tasks 1 and 2 both RESOLVED this
+session. Task 1: R2P works (interleave feasible), R2T diverges
+(structural negative), per-task measure selected
+(`...-040000-r2p-r2t-termination-generalization.md`). Task 2: wave-2
+measured (`...-042500-wave2-bidirectional-results.md`) — property specs
+(rev-involution) are the real flagship; weaker examples under-pin
+(minimality found degenerates). Live next items below: 1b (unified
+termination view), 2b (property-spec suite — the differentiator),
+2c (fix the wave-2 example arms + relevance ablation), then 3
+(first-order rep).
 
 ## Now
 
@@ -84,25 +86,35 @@ score the four predictions.
   CDCL-note stall-ordering theme) — measure whether that alone
   rescues R2T.
 
-- [ ] **2. Benchmark wave 2: bidirectionality-essential tasks**
-  (`...-220000-reflection-after-factoring-and-wave1.md`): identity #1
-  is unexercised by all nine current tasks, and backward/partial-
-  output specs should flip the follower from mostly-refuting to
-  forcing — do this before committing to view designs tuned on
-  forward tasks. Design the spec class (run-backward queries, partial
-  outputs, relation synthesis, Barliman-style), then fold into its
-  measurement pass, which runs under **untyped+TY as the default
-  architecture** (`...-212000-untyped-factoring-results.md`):
-  (a) untyped+TY port of wave 1; (b) surviving-stream sampling
-  (standing practice); (c) **symbolic/parametric examples** (survey
-  #1 — itself a richer-spec mechanism, the structural fix for the
-  evens-style spec failure, and the source of the missing
-  same-l/different-e information); (d) re-run the rung-4b
-  relevance ablation against the untyped stack (the recorded negative
-  was typed-stack-specific by design) and, if it now bites, the
-  full dataflow-relevance view design (Myth-style, canonicity
-  framing); (e) per-view refute/force attribution counters (small
-  instrumentation — unify(f) is currently the only proxy).
+- [x] **2. Benchmark wave 2: bidirectionality-essential tasks** —
+  first pass DONE (`...-042500-wave2-bidirectional-results.md`).
+  Key finding: weaker examples (symbolic W2a, partial-output W2b) admit
+  MORE degenerates, not fewer — minimality-first ID returned smaller
+  wrong programs for both, the evens lesson recurring. The real
+  flagship is **property/relational specs**: rev-involution
+  (`rev∘rev=id`) synthesized the TRUE rev-acc at the concrete bound
+  with no inverse semantics, and is exactly E&T-inaccessible
+  (no-follower symbolic arm infeasible in bound 15). tally/d earned
+  its keep (distinguished structure-forcing from a refutation win).
+  untyped+TY confirmed as default (wave-1 ports all within ±3% of
+  typed). Prerequisites (a) ports, (e) tally all done.
+
+- [ ] **2b. (spawned) Property/relational spec suite** — the direction
+  that actually differentiates vs Burst/Trio/SMyth: universal specs the
+  interpreter can only discharge by running in entangled directions,
+  which are BOTH strongly-pinning AND E&T-inaccessible (unlike weaker
+  examples). Done: rev-involution. Add: rember idempotence
+  (`rember e (rember e l) = rember e l`), append associativity,
+  `length (append a b) = length a + length b`. This is where identity
+  #1 is defended; promote over more forward tasks.
+
+- [ ] **2c. (spawned) Fix the wave-2 example arms** (methodology, cheap):
+  W2a rember-symbolic needs a middle-`e` example to force recursion
+  (the built set has only head/absent cases); W2b swap-partial needs
+  more of the output pinned. Symbolic/partial specs need an example
+  forcing each structural case — minimality exposes the gap every time.
+  Also still open from the wave-2 plan: (d) rung-4b relevance ablation
+  against the untyped stack, and the dataflow-relevance view if it bites.
 
 - [ ] **3. First-order representation of the /d search, steps 1–2,
   then the explicit scheduler on top.** Design note:
