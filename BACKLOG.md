@@ -41,6 +41,32 @@ its numbers (as every pre-view follower-ID config did) leaves the
 pruning question unanswered, and fixing that is reductions work, not
 optimization. Mere-inefficiency overhead stays out of scope.
 
+**REVISION (2026-07-13, `...-152035-classic-search-vs-current-best.md`):**
+the 175×–2,380× / 731× multipliers above compare against size-closed ID
+*without* a follower — a baseline that pays an artificial minimality-
+exhaustion tax classic miniKanren search never agreed to. The baseline
+that actually predates this project — classic fair-interleaving search
+with a typed interpreter as the sole check, no follower, no views — was
+finally benchmarked in full, all 9 tasks, fresh, both unify(main) and
+wall-clock. Against THAT baseline the efficiency story is a wash: classic
+search is often cheaper and always faster in wall-clock when it happens to
+land on something correct (evens, swap: classic search actually wins,
+having gotten lucky with mk's interleaving order and paid no exhaustion
+tax); the composed views clearly win on others (rember ~10×, duplicate
+~7×, interleave ~6×). But on **3 of 9 tasks — last, member, rev-acc,
+every task with a dead branch, a depth-bounded check, or an accumulator
+pattern — classic search silently returns a WRONG program**: correct on
+the given examples, provably wrong on unseen inputs (hand-verified with
+explicit counterexamples), and nothing about the run signals the failure.
+The current approach never does this on any task, same example budget.
+**The demonstrated value of the composed-views architecture is soundness
+under a small example budget, not raw speed** — efficiency vs. classic
+search is genuinely task-dependent and often a wash or a loss. This
+doesn't retract the FD/append existence-proof numbers (those still stand
+as answers to "does determinacy-directed propagation ever save orders of
+magnitude" — yes), but it corrects what to claim when the comparison is
+"vs. what practitioners actually do."
+
 **Session directive** (Michael, 2026-07-12, this session): explore
 (1) factoring the typechecker out of the interpreter, (2) additional
 information sources as new views, (3) whether unit propagation needs
@@ -242,8 +268,16 @@ from search-cost claims.
 - [ ] **Coverage/adequacy view via trace reification** (survey #3):
   class-B cut of unexercised-branch junk that NOTHING in the current
   stack can see; also the architectural probe of store-mediated
-  view-to-view communication. Rises in priority once branchier tasks
-  (last, swap-pairs) are measured.
+  view-to-view communication. RAISED IN PRIORITY (2026-07-13,
+  `...-152035-classic-search-vs-current-best.md`): the concrete, demonstrated
+  motivation now exists — classic search with only depth-≤3 examples
+  silently returns WRONG (non-generalizing) programs on last, member, and
+  rev-acc, and the current stack doesn't catch this either (its examples are
+  the same ones), it's just lucky that its bias toward minimal programs
+  happens to avoid the same overfits here. A coverage/adequacy check is the
+  first mechanism in this project that could actually FLAG "this program's
+  correctness on the given examples doesn't establish general correctness"
+  rather than silently trusting whichever answer search returns.
 
 - [ ] **Fix the productivity tally.** Constraint-only commits
   (symbolo/=/= etc.) are invisible to the walk*-based check — B2-ce1
