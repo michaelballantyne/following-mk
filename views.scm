@@ -21,12 +21,23 @@
 ;;                                (interleave) but refutes growing-accumulator
 ;;                                recursions R2 accepts (rev-acc).  Per-site
 ;;                                assignment.  See its section for soundness.
-;;   R2T terminating-recursiono/d the PRODUCTION termination view: whole-body
-;;                                disjunction R2 OR R2P.  Accepts iff the body
-;;                                terminates by the fixed-position measure OR by
-;;                                the injective-multiset measure -- each
-;;                                disjunct checked over ALL call sites, never
-;;                                mixed per-site.  Covers rev-acc (via R2) AND
+;;   R2T terminating-recursiono/d  *** NON-VIABLE (recorded negative) ***: the
+;;                                intended production view, whole-body disjunction
+;;                                R2 OR R2P.  Its ACCEPT/REFUTE decisions are
+;;                                correct (gates pass), but as a FOLLOWER it
+;;                                DIVERGES: concluding-oro/d re-runs both walks
+;;                                from scratch each re-fire, discarding each
+;;                                disjunct's parked suspend-depth frontier, so a
+;;                                candidate needing >1 suspend-window in the
+;;                                survivor disjunct is never refuted and evalo/d
+;;                                explodes on it (tiny unify-main, huge
+;;                                unify-follower on duplicate/interleave).  Kept
+;;                                as the documented reproduction; DO NOT use in a
+;;                                production stack -- use per-task R2 or R2P.  See
+;;                                claude/2026-07-13-040000-r2p-r2t-
+;;                                termination-generalization.md.
+;;                                Semantics as designed below: whole-body
+;;                                disjunction, each
 ;;                                interleave (via R2P).  Refutes only when BOTH
 ;;                                refute.
 ;;   TY  type-ofo/d               refutes bodies ill-typed under the task's
@@ -997,9 +1008,31 @@
         '(match l1 ['() l2] [(cons a d) (interleave d d)]))))
   '(_.0))
 
-;; === R2T: terminating-recursiono/d --- the PRODUCTION termination view:
-;; whole-body disjunction R2 OR R2P.
+;; === R2T: terminating-recursiono/d --- whole-body disjunction R2 OR R2P.
 ;;
+;; *** NON-VIABLE AS A FOLLOWER VIEW (recorded negative, 2026-07-13). ***
+;; The accept/refute SEMANTICS below are correct and all gates pass, but the
+;; combinator concluding-oro/d DIVERGES when used in a real follower: on its
+;; both-live re-fire paths it re-runs both disjunct walks from scratch and
+;; discards each disjunct's parked suspend-depth frontier, so a candidate whose
+;; termination proof in the surviving disjunct needs more than one suspend-depth
+;; window (sd=20) is never refuted -- evalo/d then evaluates the non-terminating
+;; candidate to the depth ceiling and the follower explodes (measured: tiny
+;; unify-main, exploding unify-follower on duplicate and interleave; clean
+;; machine).  Root cause is structural: an OR of two INDEPENDENTLY-suspending
+;; whole-body /d checks cannot achieve the cross-fire deepening the sound
+;; suspend-depth cutoff relies on, because each disjunct's frontier lives in its
+;; own committed scope and the follower carries a single state -- you can neither
+;; commit one disjunct's scope (that would unsoundly assert it) nor carry both.
+;; DECISION: use per-task measure selection instead (R2 default; R2P for
+;; argument-permuting recursion such as interleave -- interleave feasibility is
+;; already delivered by R2P alone, 108,475 unify @ bound 35).  Forward
+;; directions in the backlog: (1) a unified single-frontier walk that branches
+;; only at the per-self-call measure test (one committed state); (2) reorder
+;; conj/d-run's resume worklist so cheap refuters run before evalo/d.  Full
+;; mechanism: claude/2026-07-13-040000-r2p-r2t-termination-generalization.md.
+;;
+
 ;; R2 and R2P are INCOMPARABLE (see the R2P section and gates): R2 accepts
 ;; rev-acc's growing-accumulator recursion (fixed position l decreases; the
 ;; accumulator argument is simply ignored) but refutes interleave's

@@ -50,37 +50,39 @@ work**. All four explored same session; symbolic examples got folded
 into the wave-2 Now item, the other survey ideas (abstract-domain
 views, coverage) wait in Next.
 
-**Session handoff (2026-07-12, session end — cold-start here):**
-Task 1 (R2 generalization) is functionally done: R2P built (incomparable
-to R2 — rev-acc vs interleave), R2T = R2∨R2P is the production view,
-gates green (suite 120, r2p-gates 91), interleave feasible (108k @ 35).
-REMAINING: the R2T cost batch died with the session — re-run
-`./run.sh --check-follower-every 1 --timeout 240
-experiments/{rember,duplicate,rev-acc,interleave}-full-id-views-r2t.scm`,
-compare vs R2 arms (rember 312,236 / duplicate 53,812 / rev-acc 130,115
-/ interleave-r2p 108,475), decide uniform-R2T-default vs per-task
-measure, write the task-1 notebook entry (R2P/R2T story so far lives in
-commit 374ed9b's message and the agents' gate files). Task 2 (wave 2):
-design note `...-223500-wave2-bidirectional-design.md`; prerequisites
-DONE (resumption-aware tally/d — first distribution: member EX 54/436,
-TY 147/85; untyped+TY ports all within ±3% of typed, same answers) —
-next is building the three W2 arms per the design note (symbolic rember
-with same-l/different-e, prefix-partialized swap outputs, rev-involution
-with concrete anchors against the identity degenerate).
+**Session handoff (2026-07-13):** Task 1 RESOLVED (R2P works, makes
+interleave feasible; naive combined view R2T diverges — structural
+negative; per-task measure selected;
+`...-040000-r2p-r2t-termination-generalization.md`). Task 2 wave-2 arms
+built + gated; measurement batch (rember-symbolic, swap-partial,
+rev-involution, symbolic-nofollower) in flight — read
+scratchpad/wave2-batch.log, then write the wave-2 results note and
+score the four predictions.
 
 ## Now
 
 (ordered per the 2026-07-12 reflection)
 
-- [ ] **1. Generalize the termination view beyond fixed-position
-  decrease** (wave 1's one new view-shaped need,
-  `...-214500-benchmark-wave1-results.md` finding 4): interleave's
-  argument-swapping recursion is soundly refuted by R2, and the
-  R2-less stack is *infeasible* — the view is load-bearing for
-  feasibility, and it gates wave-2 benchmark breadth. Candidate
-  measures, as /d views: total-size/multiset decrease across all
-  arguments; lexicographic orders over argument permutations. Gate on
-  interleave + all existing canonicals.
+- [x] **1. Generalize the termination view beyond fixed-position
+  decrease** — RESOLVED. R2P (`permuted-decreasing-recursiono/d`,
+  injective-assignment multiset measure) admits interleave's
+  argument-swap and makes it feasible (108,475 @ 35 vs infeasible);
+  R2P is INCOMPARABLE to R2 (rev-acc's growing accumulator is
+  R2P-refuted/R2-accepted). The uniform combined view R2T = R2∨R2P
+  DIVERGES as a follower (structural: an OR of independently-suspending
+  whole-body /d checks can't deepen a single suspend-depth frontier) —
+  recorded negative, `...-040000-r2p-r2t-termination-generalization.md`.
+  Decision: per-task measure (R2 default, R2P for permuting recursion).
+
+- [ ] **1b. (spawned) Unified single-frontier termination view** — the
+  principled fix for R2T's divergence: one walk branching only at the
+  per-self-call measure test (fixed-position vs permuted), single
+  committed state → one suspension frontier to deepen. May re-hit the
+  single-state tension; needs a design pass. Also its sibling lead:
+  reorder conj/d-run's resume worklist so cheap refuters run before
+  evalo/d (touches the engine; connects to view-scheduling / the
+  CDCL-note stall-ordering theme) — measure whether that alone
+  rescues R2T.
 
 - [ ] **2. Benchmark wave 2: bidirectionality-essential tasks**
   (`...-220000-reflection-after-factoring-and-wave1.md`): identity #1
