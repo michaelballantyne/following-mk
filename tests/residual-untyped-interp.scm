@@ -251,12 +251,34 @@
       (== p 2)))
   '((1 2)))
 
-;; (d) composition with R1+R2 structural views -- SKIPPED.  As of this port,
-;;     R1's residual counterpart (base-case-patho/d-res) is only defined
-;;     inline in tests/residual-engine.scm (owned by a parallel agent's task,
-;;     not a reusable relation in views.scm yet), and R2's residual port
-;;     (decreasing-recursiono/d-res) does not exist at all yet. Re-add this
-;;     gate once both land in views.scm as loadable relations.
+;; (d) composition with R1+R2: the ground canonical rember body is ACCEPTED
+;;     by both residual structural views and by evalo-u/d-res on an example.
+;;     Port of tests/untyped-interp.scm's "evalo-u/d + R1 + R2: canonical
+;;     rember accepted (ground)", now that residual-views.scm provides
+;;     base-case-patho/d-res and decreasing-recursiono/d-res as loadable
+;;     relations. Composed the same way the closure original does: one
+;;     rfresh/d conjoining the two views with the raw (unwrapped)
+;;     evalo-u/d-res node, the whole thing wrapped in a SINGLE
+;;     follower-residual-goal (evalo-u/d-r's own wrapping is for standalone
+;;     use and would be the wrong shape to nest inside another conjunction).
+(parameterize ([*suspend-depth* 1000])
+  (test "R-untyped: evalo-u/d-res + R1 + R2: canonical rember accepted (ground)"
+    (run 1 (q)
+      (== q rember-body-u-res)
+      (follower
+        q
+        (follower-residual-goal
+          (rfresh/d ()
+            (base-case-patho/d-res 'rember q)
+            (decreasing-recursiono/d-res 'rember '(e l) q)
+            (evalo-u/d-res
+             (rember-prog-u-res q
+                                '(rember 7 (cons 3 (cons 4 (cons 7 (cons 6 '()))))))
+             '(3 4 6)))))
+      (evalo-u
+       (rember-prog-u-res q '(rember 7 (cons 3 (cons 4 (cons 7 (cons 6 '()))))))
+       '(3 4 6)))
+    (list rember-body-u-res)))
 
 ;; (e) example violation: a body that returns the input unchanged contradicts
 ;;     the example; evalo-u/d-r refutes it when driven ground.
