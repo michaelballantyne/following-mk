@@ -133,27 +133,31 @@ from search-cost claims.
   corners doc rather than chasing separately. Still open from the wave-2
   plan: rung-4b relevance ablation vs the untyped stack.
 
-- [~] **3. First-order representation of the /d search. STEP 1 DONE;
-  step 2 next. TOP PRIORITY** (2026-07-13 reflection: search strategy over
-  spec shape). Design note:
-  `claude/2026-07-12-200500-first-order-rep-design.md`; step-1 map
-  `claude/2026-07-13-042503-first-order-rep-step1-implementation-map.md`.
-  **Step 1 (conde/d site registry) implemented and validated
-  byte-identical** (`following.scm`; tv2 unify-main=2,615,131 unchanged,
-  120/120 tests; `...-043032-first-order-rep-step1-done.md`). **Step 2
-  next**: reify `conj/d-run`'s worklist into nodes + interpreter loop, same
-  byte-identical check; then store-version fast path (step 3) and the
-  explicit scheduler (step 4, where the wins are). Green-lit by
-  Michael on conceptual-clarity grounds; memory-sharing half is
-  measurement-enabling; speed half stays deprioritized; step 2's
-  printable follower trees also upgrade the sampling loop. The
-  scheduler that follows (size/cost-frontier priority queue with
-  views as the pruning/forcing layer) recovers mk's implicit
-  heuristics explicitly: geometric demotion of deep spines → the
-  termination view; ordering luck → the size guarantee; completeness
-  via fairness → levels complete by construction. Neither project
-  identity constrains the scheduler; protect the relational substrate
-  the views compose in, not the interleaving.
+- [ ] **3. Residual-goal engine (first-order representation of the /d
+  search). TOP PRIORITY.** Design REDONE with Michael 2026-07-13:
+  `claude/2026-07-13-051843-residual-goals-design.md` — a suspended
+  follower is a *residual goal* (flat conjunction of blocked
+  g-disj/g-call suspensions); evaluation is `settle`; the old
+  defunctionalization plan (`...-200500-first-order-rep-design.md`) and
+  its step-1 site registry are SUPERSEDED (registry code + tests removed;
+  the label survives as the node name field; the tv2 byte-identical
+  baseline 2,615,131 remains the old-engine reference). Key design
+  decisions recorded in the note: flatness invariant (determinate
+  progress flattens, only frozen speculation nests), guard policy
+  (recompute uncommitted — matches today's engine; failure is monotone,
+  success is not, so alive?-flags memo death only), naming
+  (g-==/g-conj/g-disj/g-call), budget = expansions per path per settle
+  pass. **Next: migration step 1–3** — build `settle` + records in
+  parallel, port base-case-patho/d, differential-test *decisions*
+  (refute/commit/suspend per trigger) against the closure engine, NOT
+  byte-identical counters. The explicit scheduler then reads the residual
+  frontier directly (size/cost-frontier priority queue with views as the
+  pruning/forcing layer), recovering mk's implicit heuristics explicitly:
+  geometric demotion of deep spines → the termination view; ordering luck
+  → the size guarantee; completeness via fairness → levels complete by
+  construction. Neither project identity constrains the scheduler;
+  protect the relational substrate the views compose in, not the
+  interleaving.
 
 ## Next
 

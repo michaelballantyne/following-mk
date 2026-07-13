@@ -11,7 +11,6 @@
 (load "tests/leading-following.scm")
 (load "tests/untyped-interp.scm")
 (load "tests/view-tallies.scm") ; depends on views.scm (loaded by untyped-interp)
-(load "tests/conde-d-registry.scm") ; step-1 first-order-rep registry gates
 
 (test-summary)
 (when test-failed
