@@ -196,3 +196,47 @@
         (rconde/d
           ([] [(rdiverge/d)] [(r==/d q 'A)])
           ([] [(r==/d 1 1)] [(r==/d q 'B)]))))))
+
+;;; ----------------------------------------------------------------
+;;; The one understood, one-sided exception to decision-vector equality:
+;;; dead-alternative pruning skips re-verification of dead guards.
+;;;
+;;; Scenario: a 3-alt disj where alt A's guard fails only AFTER budget-blocking
+;;; work (diverge, then y = 1 and y = 2), and alts B/C stall on an outer var x
+;;; the main search grounds later.  On the retrigger the closure engine
+;;; re-verifies A's dead guard from scratch, paying its suspend-depth cutoff a
+;;; second time; the residual engine pruned A out of the stalled disj on the
+;;; first pass (sound: guard failure is monotone in the growing store), so its
+;;; cutoff tally is one lower.  The follower decisions (fail / singleton /
+;;; suspend -- the first three components) must ALWAYS match; only the cutoff
+;;; work count may differ, and only in this direction: pruning can make the
+;;; residual tally LOWER, never higher.  Both vectors are hard-coded so any
+;;; future shift in either engine flags loudly.  Deliberately NOT written with
+;;; decision-equiv, which asserts full equality.
+;;; ----------------------------------------------------------------
+
+(test "D-guard: pruning skips dead-guard re-verification (cutoff lower by 1, decisions equal)"
+  (list
+   (decisions-of
+    (lambda ()
+      (run 1 (q)
+        (fresh (x)
+          (follower (list q x)
+            (conde/d
+              ([y] [(diverge/d) (==/d y 1) (==/d y 2)] [(==/d q 'A)])
+              ([] [(==/d x 1)] [(==/d q 'B)])
+              ([] [(==/d x 2)] [(==/d q 'C)])))
+          (== x 1)))))
+   (decisions-of
+    (lambda ()
+      (run 1 (q)
+        (fresh (x)
+          (follower (list q x)
+            (follower-residual-goal
+              (rconde/d
+                ([y] [(rdiverge/d) (r==/d y 1) (r==/d y 2)] [(r==/d q 'A)])
+                ([] [(r==/d x 1)] [(r==/d q 'B)])
+                ([] [(r==/d x 2)] [(r==/d q 'C)]))))
+          (== x 1))))))
+  '((0 1 1 2)    ; closure : re-pays alt A's cutoff on the retrigger
+    (0 1 1 1)))  ; residual: alt A pruned after its first (failing) scan

@@ -156,8 +156,20 @@ from search-cost claims.
   (fail/singleton/suspend/cutoff) is IDENTICAL to the closure engine on all
   six probes (conde/d work-count differs in the small, as the note predicted
   and excluded). The engine the explicit scheduler needs now exists.
+  **Post-resolution review (2026-07-13,
+  `...-061616-residual-engine-review.md` +
+  `...-063014-residual-engine-review-fixes.md`):** the six probes missed an
+  exponential commit-splice bug — budget-blocked guard leftovers re-expanded
+  at commit with refreshed budget (2^22 cutoffs vs 2 on guard-robustness
+  case 1). Fixed by seeding guard residuals into settle-conj's soft/hard
+  pools, mirroring conj/d-run exactly. Guard-robustness ported (the suite
+  that would have caught it), dead-alt pruning landed (one understood
+  one-sided cutoff divergence, pinned by a hard-coded witness test), stamp
+  fast path explicitly deferred to cutover. Suite 157 → 171.
 
 - [ ] **3b. (spawned) Cutover + delete the closure engine (steps 5–6).**
+  Cutover bar (from the review's methodology note): every closure-engine
+  test file gets a residual port or a recorded reason it can't have one.
   Port R2/TY/NV to r-forms (mechanical, the interpreter proved it's free;
   `concluding-oro/d`/R2T manipulates inf/d directly and is the non-viable
   negative — drop or reimplement over residuals), rename r→canonical, delete
