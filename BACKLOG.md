@@ -278,6 +278,24 @@ from search-cost claims.
   first mechanism in this project that could actually FLAG "this program's
   correctness on the given examples doesn't establish general correctness"
   rather than silently trusting whichever answer search returns.
+  **SHARPENED FURTHER (2026-07-13,
+  `...-193454-fair-search-plus-views-unsound-on-subset.md`):** confirmed
+  "lucky, not sound" precisely. Ran the SAME composed view stack (R1/R2/TY/NV)
+  under fair search instead of ID, sweeping check-follower-every 1/20/100 —
+  every "wrong" answer hand-traced by substitution, not trusted from
+  pass/fail alone. Result: R1/R2/TY/NV provably CANNOT refute a
+  non-recursive, zero-self-call candidate (R1 only catches
+  every-path-applies-fname; R2's "every self-call decreases" is vacuously
+  true with no self-calls; TY/NV have nothing to check on a well-typed,
+  if-free hardcoded term) — the views never touch this failure class,
+  regardless of search strategy. duplicate and rev-acc came back WRONG at
+  ce1/ce20 and only correct at ce100 (an empirical accident of search
+  order, not a fix); last and member stayed wrong at EVERY setting tried.
+  Minimality (ID's guarantee, not the views) is the thing actually
+  preventing these overfits on this subset — a fact the project's own
+  numbers hadn't isolated until this comparison. Consequence: do not adopt
+  fair-search-as-a-general-substitute-for-ID without either fixing example
+  adequacy (item 2c) or building this coverage view first.
 
 - [ ] **Fix the productivity tally.** Constraint-only commits
   (symbolo/=/= etc.) are invisible to the walk*-based check — B2-ce1
