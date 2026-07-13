@@ -11,6 +11,8 @@
 (load "tests/leading-following.scm")
 (load "tests/untyped-interp.scm")
 (load "tests/view-tallies.scm") ; depends on views.scm (loaded by untyped-interp)
+(load "tests/residual-engine.scm") ; residual engine vs closure engine (differential)
+(load "tests/residual-interp.scm") ; residual /d interpreter + refutation (differential)
 
 (test-summary)
 (when test-failed

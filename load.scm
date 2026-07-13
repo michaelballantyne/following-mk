@@ -3,3 +3,4 @@
 (load "mk/numbers.scm")
 (load "mk/test-check.scm")
 (load "following.scm")
+(load "residual.scm")
