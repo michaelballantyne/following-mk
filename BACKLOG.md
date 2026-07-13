@@ -64,15 +64,19 @@ rember, rev) shows: on every task, a SINGLE ground anchor pins the answer
 at least as well as the relational property and 5–64× cheaper in follower
 work; rev-anchor-only alone synthesizes canonical rev-acc that wave-2 had
 credited to the involution property. Relational property = pure follower
-overhead when a pinning ground example exists (all three tasks). The real
-differentiator is NOT "property vs example" but tasks where a pinning
-ground example is *structurally unavailable* — see new Now item 2d. Live
-next items: **2d (find the profit regime)**, 1b (unified termination view),
-then 3 (first-order rep).
+overhead when a pinning ground example exists (all three tasks). Live
+next items reset by the reflection
+`...-041925-reflection-bidirectionality-is-expressiveness-not-efficiency.md`:
+**3 (first-order rep — where the measured wins live)**, then 1b (unified
+termination view). Bidirectionality is now understood as an *expressiveness*
+win (write once, run all directions, no inverse semantics), NOT a
+search-efficiency win — so the property-spec-as-efficiency line is closed
+and identity #1's defense is an expressiveness write-up (Later), decoupled
+from search-cost claims.
 
 ## Now
 
-(ordered per the 2026-07-12 reflection)
+(re-ordered by the 2026-07-13 reflection: search strategy over spec shape)
 
 - [x] **1. Generalize the termination view beyond fixed-position
   decrease** — RESOLVED. R2P (`permuted-decreasing-recursiono/d`,
@@ -99,14 +103,13 @@ then 3 (first-order rep).
   first pass DONE (`...-042500-wave2-bidirectional-results.md`).
   Key finding: weaker examples (symbolic W2a, partial-output W2b) admit
   MORE degenerates, not fewer — minimality-first ID returned smaller
-  wrong programs for both, the evens lesson recurring. The real
-  flagship is **property/relational specs**: rev-involution
-  (`rev∘rev=id`) synthesized the TRUE rev-acc at the concrete bound
-  with no inverse semantics, and is exactly E&T-inaccessible
-  (no-follower symbolic arm infeasible in bound 15). tally/d earned
-  its keep (distinguished structure-forcing from a refutation win).
-  untyped+TY confirmed as default (wave-1 ports all within ±3% of
-  typed). Prerequisites (a) ports, (e) tally all done.
+  wrong programs for both, the evens lesson recurring. Wave-2 named
+  property specs the "flagship," **but 2b later RETRACTED that** —
+  rev-involution was carried by its ground anchor, not the involution
+  property (see 2b and the 2026-07-13 reflection). What survives from
+  wave-2: the weaker-examples-admit-more-degenerates finding; tally/d
+  earning its keep; untyped+TY confirmed as default (wave-1 ports all
+  within ±3% of typed). Prerequisites (a) ports, (e) tally all done.
 
 - [x] **2b. Property/relational spec suite** — RESOLVED, negatively and
   importantly (`...-041637-property-specs-are-anchor-carried.md`).
@@ -118,22 +121,10 @@ then 3 (first-order rep).
   smallest degenerate (append `s`, rember `l`); the property changes
   nothing about which program is found and adds only entangled-eval
   follower cost. **Retracts the wave-2 flagship claim** (rev-involution
-  was anchor-carried). Consequence → 2d.
-
-- [ ] **2d. (spawned) Find the PROFIT regime for the relational
-  substrate.** 2b showed the capability (run entangled, no inverse
-  semantics) is real but unprofitable whenever a pinning ground example
-  exists. The differentiator must be tasks where a pinning ground
-  example is *structurally unavailable*: (i) true relation synthesis
-  (no functional I/O to anchor); (ii) run-backward-only / partial-input
-  specs where the forward ground point doesn't pin; (iii) Michael's
-  Peano-length `length(append(a,b))=append(length(a),length(b))` with
-  `length` producing a unary list and `+`=append at the object level —
-  requires multi-function synthesis (co-synthesize length, or fix
-  append), so no single forward I/O pair pins it. This is a
-  task-SELECTION problem, not a view/engine problem. Pick one, build the
-  arm + an "is there any single ground example that pins this?" negative
-  check, measure.
+  was anchor-carried). Consequence: bidirectionality is expressiveness,
+  not efficiency (reflection
+  `...-041925-reflection-bidirectionality-is-expressiveness-not-efficiency.md`);
+  the property-spec-as-efficiency line is closed, priority moves to item 3.
 
 - [ ] **2c. Methodology note (cheap, now lower priority):** single ground
   anchors UNDER-pin (rember head-wrap degenerate from
@@ -260,7 +251,21 @@ then 3 (first-order rep).
   `*main-unsound-depth*` never fires on the benchmark suite either
   (depth-cut 0) — both unsound knobs are now candidates for demotion
   to pure diagnostics or removal.
-- (moved to Next: benchmark broadening)
+- **Profit regime for bidirectionality (demoted from 2d).** 2b closed the
+  efficiency case for property specs on functions with cheap forward
+  examples. The reflection
+  (`...-041925-...expressiveness-not-efficiency.md`) found the surviving
+  candidates all need an object-language change or are out of scope:
+  (i) nondeterministic relations where a functional example over-commits
+  (insert-anywhere, permutation, sort) — but the object language is
+  deterministic-functional and lacks `<`/arithmetic; (ii) oracle-free PBE
+  (no ground truth to score). Michael's Peano-length
+  `length(append(a,b))=append(length(a),length(b))` (length → unary list,
+  `+`=append at object level) is expressible but multi-function and STILL
+  has cheap ground examples per component, so it's not in the regime either.
+  Revisit only if the object language grows nondeterminism or a real
+  no-oracle task appears. Identity #1's proper defense is an expressiveness
+  write-up (author effort / inverse-code avoided), not a search-cost arm.
 - Racket port — only if Chez friction hurts again.
 
 ## Resolved
