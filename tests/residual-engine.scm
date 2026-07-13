@@ -10,6 +10,13 @@
 ;; also validate the inf/d-protocol wrapper (settle->inf/d) and cross-trigger
 ;; re-settle (residual-resume).
 
+;; Part 2 below needs the R1 r-form port (base-case-patho/d-res et al.);
+;; that now lives in residual-views.scm (the full R1/R2/R2P/TY/NV residual
+;; view-vocabulary port, backlog 3b) rather than being defined inline here.
+;; residual-views.scm is self-contained (doesn't require views.scm), so this
+;; load works whether or not views.scm has already been loaded.
+(load "residual-views.scm")
+
 ;;; ================================================================
 ;;; Part 1 --- core /d control (port of determinacy-goal-forms.scm)
 ;;; ================================================================
@@ -132,48 +139,17 @@
 
 ;;; ================================================================
 ;;; Part 2 --- R1 base-case-patho/d, ported (recursion through g-call)
+;;;
+;;; The r-form definitions (patho-oro/d-res, rands-patho/d-res,
+;;; base-case-patho/d-res, view-app-keywords-res) now live in
+;;; residual-views.scm (the migration's residual view-vocabulary port,
+;;; backlog 3b) alongside the R2/R2P/TY/NV r-form ports; loaded via
+;;; test-all.scm's chain (tests/untyped-interp.scm loads views.scm, which
+;;; residual-views.scm's own definitions do not depend on, but standalone
+;;; runs should load residual-views.scm explicitly after views.scm -- see
+;;; the ./run.sh invocation documented in residual-views.scm's own header /
+;;; the migration notebook entry).
 ;;; ================================================================
-
-(define view-app-keywords-res '(quote cons letrec match if))
-
-(define-relation/d (patho-oro/d-res fname ea eb)
-  (rconde/d
-    ([] [(base-case-patho/d-res fname ea)] [])
-    ([] [(base-case-patho/d-res fname eb)] [])))
-
-(define-relation/d (rands-patho/d-res fname rands)
-  (rconde/d
-    ([] [(r==/d '() rands)] [])
-    ([a d]
-     [(r==/d `(,a . ,d) rands)]
-     [(base-case-patho/d-res fname a) (rands-patho/d-res fname d)])))
-
-(define-relation/d (base-case-patho/d-res fname body)
-  (rconde/d
-    ([] [(rnumbero/d body)] [])
-    ([] [(rsymbolo/d body)] [])
-    ([] [(r==/d '(quote ()) body)] [])
-    ([e1 e2]
-     [(r==/d `(cons ,e1 ,e2) body)]
-     [(base-case-patho/d-res fname e1) (base-case-patho/d-res fname e2)])
-    ([e1 e2 e3 e4]
-     [(r==/d `(if (= ,e1 ,e2) ,e3 ,e4) body)]
-     [(base-case-patho/d-res fname e1)
-      (base-case-patho/d-res fname e2)
-      (patho-oro/d-res fname e3 e4)])
-    ([e e1 x y e2]
-     [(r==/d `(match ,e ['() ,e1] [(cons ,x ,y) ,e2]) body)
-      (rsymbolo/d x)
-      (rsymbolo/d y)
-      (r=/=/d x fname)
-      (r=/=/d y fname)]
-     [(base-case-patho/d-res fname e) (patho-oro/d-res fname e1 e2)])
-    ([rator rands]
-     [(r==/d `(,rator . ,rands) body)
-      (rsymbolo/d rator)
-      (r=/=/d rator fname)
-      (rabsento/d rator view-app-keywords-res)]
-     [(rands-patho/d-res fname rands)])))
 
 (test "R: base-case-patho/d ground (rember e d) is refuted"
   (run 1 (q)
