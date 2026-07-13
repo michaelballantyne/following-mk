@@ -214,3 +214,57 @@
     (follower q (follower-residual-goal
                   (base-case-patho/d-res 'rember q))))
   '(_.0))
+
+;;; ================================================================
+;;; Part 3 --- direct settle-level shape tests (not through the follower)
+;;;
+;;; Call `settle` on a goal node from `empty-state` at depth 0 and inspect the
+;;; returned residual's SHAPE, checking the design note's data invariants
+;;; directly rather than only observing final answers through the follower.
+;;; ================================================================
+
+;; (a) A committing goal (sole-survivor conde/d) settles to TOP + a state that
+;; carries both the guard's and the body's extension.
+(test "R-shape: committing goal yields TOP + extended state"
+  (let* ([x (var (new-scope))]
+         [q (var (new-scope))]
+         [g (rconde/d
+              ([] [(r==/d x 1)] [(r==/d q 'committed)])
+              ([] [rfail/d] [(r==/d q 'other)]))]
+         [r (settle g empty-state 0)])
+    (list (and r #t)
+          (g-top? (car r))
+          (walk x (state-S (cdr r)))
+          (walk q (state-S (cdr r)))))
+  '(#t #t 1 committed))
+
+;; (b) A genuinely nondet conde/d (two independently-applicable guards) settles
+;; to a flat residual: a g-conj of exactly one g-disj, passing the flatness
+;; invariant, with a sane S-expression rendering (`(conj (disj:... ...))`).
+(test "R-shape: nondet disj yields a flat, well-shaped residual"
+  (let* ([x (var (new-scope))]
+         [q (var (new-scope))]
+         [g (rconde/d
+              ([] [(r==/d x 1)] [(r==/d q 1)])
+              ([] [(r==/d x 2)] [(r==/d q 2)]))]
+         [r (settle g empty-state 0)])
+    (assert-flat-residual! (car r)) ; raises (=> test fails) if not flat
+    (let ([sexp (residual->sexp (car r))])
+      (list (g-top? (car r))
+            (length (g-conj-goals (car r)))
+            (car sexp)                                  ; 'conj
+            (g-disj? (car (g-conj-goals (car r))))      ; sole conjunct is a disj
+            (symbol? (car (cadr sexp))))))              ; renders as (disj:LABEL ..)
+  '(#f 1 conj #t #t))
+
+;; (c) A budget-blocked recursion (a relation that recurses through a
+;; sole-survivor conde/d with no base case) settles to a residual whose sole
+;; conjunct is a g-blocked node -- the residual analogue of hard suspension.
+(test "R-shape: budget-blocked recursion yields a g-blocked conjunct"
+  (let* ([r (settle (r/d-res) empty-state 0)]
+         [conjs (g-conj-goals (car r))])
+    (assert-flat-residual! (car r))
+    (list (g-top? (car r))
+          (length conjs)
+          (g-blocked? (car conjs))))
+  '(#f 1 #t))

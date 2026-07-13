@@ -20,6 +20,14 @@
 ;; r==/d, ...) to avoid clashing.  At cutover they take the canonical names and
 ;; the closure engine is deleted.
 ;;
+;; NOT YET IMPLEMENTED: the stamp fast path.  The design note's incrementality
+;; story (each node carries the store version it last settled against, so an
+;; unchanged store is an O(1) pointer comparison instead of a re-settle) is NOT
+;; built here.  It is an optimization, orthogonal to decisions, and is deferred
+;; to cutover (migration-plan steps 5-6).  Until then EVERY trigger re-settles
+;; every residual conjunct from scratch -- correct but not incremental.  Do not
+;; read the design note as describing this file's behavior on that point.
+;;
 ;; DEPTH / BUDGET.  Unlike the tentative "budget per g-call" in the design note,
 ;; depth is counted at g-disj (= one conde/d evaluation), exactly matching the
 ;; closure engine's `check-suspend-depth` (which wraps each conde/d).  g-call is
@@ -84,7 +92,11 @@
     [(g-conj? g) (settle-conj (g-conj-goals g) st depth)]
     [(g-disj? g) (settle-disj g st depth)]
     [(g-call? g) (settle-call g st depth)]
-    ;; a budget-blocked disj re-attempts with the current (trigger-fresh) budget
+    ;; g-blocked is the TRIGGER-PATH re-attempt only: a budget-blocked disj
+    ;; carried in the residual conjunction is re-settled with the current
+    ;; (trigger-fresh) budget.  It is NOT reached mid-pass at commit -- the
+    ;; commit case seeds g-blocked leftovers into settle-conj's hard pool, which
+    ;; never re-settles them within the pass (see settle-disj).
     [(g-blocked? g) (settle-disj (g-blocked-disj g) st depth)]
     [else (error 'settle "not a goal node" g)]))
 
@@ -113,40 +125,53 @@
 ;; and splicing each child's residual (a flat conj) into a leftover pool.  #f if
 ;; any child fails.  After a pass, if the store grew, re-sweep the leftovers
 ;; (quiescence).  Residual = flat g-conj of the surviving leftovers.
-(define (settle-conj goals st depth)
-  (let pass ([goals goals]
-             [st st]
-             [soft '()]   ; store-blocked leftovers (g-disj); re-swept on change
-             [hard '()]   ; budget-blocked leftovers (g-blocked); deferred
-             [entry-M (subst-map (state-S st))]
-             [entry-C (state-C st)])
-    (cond
-      [(null? goals)
-       (let ([changed? (or (not (eq? entry-M (subst-map (state-S st))))
-                           (not (eq? entry-C (state-C st))))])
-         (if (and (pair? soft) changed?)
-             ;; store grew this pass -> re-sweep only the store-blocked
-             ;; leftovers; keep the budget-blocked ones aside untouched
-             (pass soft st '() hard (subst-map (state-S st)) (state-C st))
-             (cons (make-g-conj (append soft hard)) st)))]
-      [else
-       (let ([r (settle (car goals) st depth)])
-         (and r
-              (let-values ([(s h) (partition-blocked (g-conj-goals (car r)))])
-                (pass (cdr goals)
-                      (cdr r)
-                      (append soft s)
-                      (append hard h)
-                      entry-M
-                      entry-C))))])))
+;;
+;; soft/hard are the INITIAL leftover pools -- empty for a plain conjunction,
+;; but a committing g-disj seeds them with the surviving guard's residual (its
+;; store-blocked disjs into soft, budget-blocked into hard) so that guard
+;; obligation joins the body's settle in one pass, exactly matching
+;; conde/d-runtime's `(conj/d-run sd (list body) c (list f) '())`.
+(define settle-conj
+  (case-lambda
+    [(goals st depth) (settle-conj goals st depth '() '())]
+    [(goals st depth soft hard)
+     (let pass ([goals goals]
+                [st st]
+                [soft soft] ; store-blocked leftovers (g-disj); re-swept on change
+                [hard hard] ; budget-blocked leftovers (g-blocked); deferred
+                [entry-M (subst-map (state-S st))]
+                [entry-C (state-C st)])
+       (cond
+         [(null? goals)
+          (let ([changed? (or (not (eq? entry-M (subst-map (state-S st))))
+                              (not (eq? entry-C (state-C st))))])
+            (if (and (pair? soft) changed?)
+                ;; store grew this pass -> re-sweep only the store-blocked
+                ;; leftovers; keep the budget-blocked ones aside untouched
+                (pass soft st '() hard (subst-map (state-S st)) (state-C st))
+                (cons (make-g-conj (append soft hard)) st)))]
+         [else
+          (let ([r (settle (car goals) st depth)])
+            (and r
+                 (let-values ([(s h) (partition-blocked (g-conj-goals (car r)))])
+                   (pass (cdr goals)
+                         (cdr r)
+                         (append soft s)
+                         (append hard h)
+                         entry-M
+                         entry-C))))]))]))
 
 ;; settle-disj: the committing conde.  Mirrors conde/d-runtime exactly.
 ;;   depth > *suspend-depth*  -> budget-blocked: leave the whole disj residual
 ;;                               (hard suspend), state unchanged
 ;;   else evaluate each alt's guard speculatively from the base store at depth+1:
 ;;     0 guards apply  -> #f              (refute)
-;;     1 guard  applies -> COMMIT: adopt its guard-state, settle
-;;                         (guard-residual ++ body) at depth+1
+;;     1 guard  applies -> COMMIT: adopt its guard-state, settle the BODY at
+;;                         depth+1 with the guard's residual seeded into the
+;;                         conj pools (soft store-blocked, hard budget-blocked)
+;;                         -- NOT re-settled as goals, so a diverging guard's
+;;                         budget-blocked tail is deferred to the next trigger
+;;                         instead of being re-expanded here
 ;;     >=2 guards apply -> stall: leave the whole disj residual, state unchanged
 ;;                         (re-checked from scratch on the next settle)
 (define (settle-disj g st depth)
@@ -159,25 +184,48 @@
         (increment-counter! *conde/d-counter*)
         (record-depth-entry! (g-disj-name g) depth)
         (let loop ([alts (g-disj-alts g)]
-                   [found #f]) ; #f or (list guard-residual guard-state body)
+                   [found #f]   ; #f or (list guard-residual guard-state body)
+                   [alive '()]) ; surviving alts scanned so far, reversed
           (if (null? alts)
               (if found
-                  ;; exactly one alternative applied -> commit
-                  (settle (make-g-conj (append (g-conj-goals (car found))
-                                               (g-conj-goals (caddr found))))
-                          (cadr found)
-                          d1)
+                  ;; exactly one alternative applied -> commit.  The body goals
+                  ;; settle; the guard's own residual enters the conj pools
+                  ;; directly (soft re-swept only if the pass changes the store,
+                  ;; hard deferred to the next trigger) -- exactly
+                  ;; conde/d-runtime's (conj/d-run sd (list body) c (list f) '()).
+                  (let ([guard-residual (car found)]
+                        [guard-state (cadr found)]
+                        [body (caddr found)])
+                    (let-values ([(s h) (partition-blocked
+                                         (g-conj-goals guard-residual))])
+                      (settle-conj (g-conj-goals body) guard-state d1 s h)))
                   ;; no alternative applied -> refute
                   #f)
               (let ([r (settle (g-alt-guard (car alts)) st d1)])
                 (cond
-                  [(not r) (loop (cdr alts) found)] ; guard failed: drop this alt
+                  ;; guard failed: drop this alt PERMANENTLY.  Failure is
+                  ;; monotone -- a guard that fails against this base store fails
+                  ;; against every larger one -- so a failed alt is dead for good
+                  ;; and never re-enters `alive`.
+                  [(not r) (loop (cdr alts) found alive)]
                   [found
-                   ;; a second alternative applies -> stall the whole disj
-                   (cons (make-g-conj (list g)) st)]
+                   ;; a second alternative applies -> stall.  Rebuild the disj
+                   ;; WITHOUT the alternatives whose guards failed this pass:
+                   ;; keep the survivors scanned so far (in `alive`), this second
+                   ;; survivor, and the UNSCANNED tail (alts after this one,
+                   ;; never tested this pass -- keeping them is required, they
+                   ;; may still apply).  Name preserved for the depth tally.
+                   ;; Decisions unchanged: a pruned guard would have failed
+                   ;; again; only the re-settle/re-trigger work count shrinks.
+                   (let ([pruned (make-g-disj
+                                  (g-disj-name g)
+                                  (append (reverse (cons (car alts) alive))
+                                          (cdr alts)))])
+                     (cons (make-g-conj (list pruned)) st))]
                   [else
                    (loop (cdr alts)
-                         (list (car r) (cdr r) (g-alt-body (car alts))))])))))))
+                         (list (car r) (cdr r) (g-alt-body (car alts)))
+                         (cons (car alts) alive))])))))))
 
 ;;; ------------------------------------------------------------------
 ;;; Follower integration
@@ -194,7 +242,12 @@
     (cond
       [(not r) #f]                              ; refuted
       [(g-top? (car r)) (cdr r)]                ; singleton success
-      [else (cons (cdr r) (residual-resume (car r)))]))) ; suspended (soft)
+      [else
+       ;; suspended (soft): check the flatness invariant on every trigger --
+       ;; O(residual width), turns the design note's prose invariant into a
+       ;; checked property at the one place every live residual passes through.
+       (assert-flat-residual! (car r))
+       (cons (cdr r) (residual-resume (car r)))])))
 
 ;; Resume thunk of the shape conj/d-run / run-and-set-follower expect:
 ;; (lambda (suspend-depth) (lambda (st) inf/d)).  suspend-depth is ignored --
@@ -228,8 +281,9 @@
 
 ;; The always-succeed leaf (used by staging base cases): TOP.
 (define rsucceed/d g-top)
-;; The always-fail leaf idiom (=/=/d 'x 'x can never hold).
-(define rfail/d (make-g-prim '=/= (list 'x 'x) (=/= 'x 'x)))
+;; The always-fail leaf: an honest failing primitive (goal returns #f on every
+;; state), so settle-prim refutes.
+(define rfail/d (make-g-prim 'fail '() (lambda (st) #f)))
 
 ;; rfresh/d: allocate fresh vars (at build/expansion time) and return a conj.
 ;; No runtime fresh node; binders exist only in source.

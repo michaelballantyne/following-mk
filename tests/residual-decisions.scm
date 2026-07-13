@@ -23,14 +23,15 @@
   (thunk)
   (follower-decision-vector))
 
+;; Run each side exactly once: `actual` is the residual engine's decision
+;; vector, `expected` is the closure engine's.  Each `decisions-of` runs a full
+;; `run` (which resets the counters on entry) and reads the vector back, so the
+;; two runs don't interfere regardless of evaluation order.
 (define-syntax decision-equiv
   (syntax-rules ()
     [(_ title closure-run residual-run)
      (test title
-       (let ([r (decisions-of (lambda () residual-run))])
-         (let ([c (decisions-of (lambda () closure-run))])
-           ;; return residual's vector; expected = closure's vector
-           r))
+       (decisions-of (lambda () residual-run))
        (decisions-of (lambda () closure-run)))]))
 
 ;; --- refute: cons shape can't produce '()

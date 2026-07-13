@@ -14,6 +14,7 @@
 (load "tests/residual-engine.scm") ; residual engine vs closure engine (differential)
 (load "tests/residual-interp.scm") ; residual /d interpreter + refutation (differential)
 (load "tests/residual-decisions.scm") ; per-trigger decision-equivalence vs closure
+(load "tests/residual-guards.scm") ; guard-robustness ported to residual + decision-equiv
 
 (test-summary)
 (when test-failed
