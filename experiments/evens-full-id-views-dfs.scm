@@ -1,0 +1,69 @@
+;; evens-full-id-views-dfs.scm --- size-closed ID synthesis of `evens`, the full
+;; follower stack (R1+R2+TY+NV) PLUS evalo/d over the examples, check-every 1.
+;; IDDFS variant of experiments/evens-full-id-views.scm: same everything, but
+;; the per-level search is depth-first (dfs-search.scm's mplus) instead of fair
+;; interleaving. Mirrors experiments/rember-full-id-views.scm.
+;;
+;; Task: evens : ((list) -> list).  Every other element starting with the first.
+;;   (a b c d e) -> (a c e).
+;;
+;; Canonical body (answer):
+;;   (match l ['() '()]
+;;     [(cons a d) (match d ['() (cons a '())]
+;;                   [(cons b dd) (cons a (evens dd))])])
+;; Size under the repo measure (pattern-binders a,d,b,dd = 0): 69.
+;; Expected answer at bound 71 (bounds 39..75 step 4; 69 first lands on grid 71).
+;;
+;; Examples (5), and the degenerates each kills:
+;;   (evens ())        => ()      base
+;;   (evens (5))       => (5)      single element (the identity also passes this
+;;                                 -- see next)
+;;   (evens (5 6))     => (5)      kills identity / "return whole list"
+;;   (evens (5 6 7))   => (5 7)    kills "return first element only"
+;;   (evens (5 6 7 8)) => (5 7)    kills the NON-recursive "head + drop-second"
+;;                                 program -- the first measured run (4 examples,
+;;                                 max length 3) returned exactly that degenerate
+;;                                 at bound 51: (match l ['() l] [(cons a d)
+;;                                 (cons a (match d ['() d] [(cons b dd) dd]))]),
+;;                                 correct on all inputs up to length 3.  A
+;;                                 length->=4 example forces genuine recursion.
+;; Absento excludes example constants 5,6,7,8; the canonical body has no numeric
+;; literals.
+;;
+;;   ./run.sh --check-follower-every 1 --timeout 500 experiments/evens-full-id-views-dfs.scm
+(load "experiments/id-harness.scm")
+(load "views.scm") ; R1+R2+TY+NV view definitions
+(load "dfs-search.scm") ; per-level search: depth-first instead of fair interleaving
+
+(define (evens-prog q body)
+  `(letrec ([evens (lambda (l) : ((list) -> list)
+                     ,q)])
+     ,body))
+
+(define evens-tyenv '((evens . ((list) -> list)) (l . list)))
+
+(run-id "evens-full/views/dfs" '(39 43 47 51 55 59 63 67 71 75) 1000
+  (lambda (bound)
+    (run 1 (q)
+      (watch-size q)
+      (absento 5 q)
+      (absento 6 q)
+      (absento 7 q)
+      (absento 8 q)
+      (follower
+        q
+        (fresh/d ()
+          (base-case-patho/d 'evens q)
+          (decreasing-recursiono/d 'evens '(l) q)
+          (type-ofo/d evens-tyenv q 'list)
+          (non-vacuous-testso/d q)
+          (evalo/d (evens-prog q '(evens '())) '())
+          (evalo/d (evens-prog q '(evens (cons 5 '()))) '(5))
+          (evalo/d (evens-prog q '(evens (cons 5 (cons 6 '())))) '(5))
+          (evalo/d (evens-prog q '(evens (cons 5 (cons 6 (cons 7 '()))))) '(5 7))
+          (evalo/d (evens-prog q '(evens (cons 5 (cons 6 (cons 7 (cons 8 '())))))) '(5 7))))
+      (evalo (evens-prog q '(evens '())) '())
+      (evalo (evens-prog q '(evens (cons 5 '()))) '(5))
+      (evalo (evens-prog q '(evens (cons 5 (cons 6 '())))) '(5))
+      (evalo (evens-prog q '(evens (cons 5 (cons 6 (cons 7 '()))))) '(5 7))
+      (evalo (evens-prog q '(evens (cons 5 (cons 6 (cons 7 (cons 8 '())))))) '(5 7)))))
