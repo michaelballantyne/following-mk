@@ -67,6 +67,20 @@ as answers to "does determinacy-directed propagation ever save orders of
 magnitude" — yes), but it corrects what to claim when the comparison is
 "vs. what practitioners actually do."
 
+**UPDATE (2026-07-14, `...-014941-iddfs-results.md`, see Now item 0):**
+first real progress on the reflection's "move to explicit search
+strategies" line — swapping fair interleaving for size-bounded IDDFS (a
+two-line `mplus` change) is 1.6–88× faster in wall-clock than the fair
+`-id-views` "current best" on all 9 tasks, correct on all 9. Two
+methodology consequences: (i) unify(main) and wall-clock DIVERGE under a
+search-strategy change (DFS does more unifications but less allocation/GC),
+so wall-clock claims need wall-clock measurement — unify(main) stays valid
+only for pruning comparisons under a *fixed* strategy; (ii)
+`check-follower-every`'s best value is strategy-dependent (ce≈20 for DFS,
+opposite of fair search's ce100). Does not change the soundness story above
+(IDDFS keeps minimality, so it keeps the correctness the fair-without-ID
+arm lost).
+
 **Session directive** (Michael, 2026-07-12, this session): explore
 (1) factoring the typechecker out of the interpreter, (2) additional
 information sources as new views, (3) whether unit propagation needs
@@ -110,6 +124,29 @@ from search-cost claims.
 ## Now
 
 (re-ordered by the 2026-07-13 reflection: search strategy over spec shape)
+
+- [x] **0. Size-bounded IDDFS as the per-level search** — RESOLVED, a win
+  (2026-07-14, design `...-012017-iddfs-search-design.md`, results
+  `...-014941-iddfs-results.md`). Swapped the leader's per-level search from
+  fair interleaving to depth-first — a two-line `mplus` change
+  (`(mplus (f) f^)` → `(mplus (f^) f)`) in `dfs-search.scm`, keeping
+  size-frontier iterative deepening (run-id) on top. Touches only the leader
+  (follower is settle, untouched); order-verified; ~32 MB vs fair search's
+  GB-scale. Result across all 9 tasks, same machine/session, hand-verified
+  correct: **1.6–88× wall-clock faster than fair `-id-views`** (rev-acc
+  39.4s→0.45s the standout), and **correct on all 9** — including the four
+  (last/member/duplicate/rev-acc) the fair-search-*without*-ID sweep silently
+  broke, because size-frontier IDDFS keeps smallest-answer-first. The double
+  win the design predicted. Two findings: (a) unify-main and wall-clock
+  DIVERGE under a strategy change (DFS does more unifications yet runs faster
+  — less thunk/GC overhead; measure wall-clock for wall-clock claims); (b)
+  `check-follower-every` tuning INVERTS vs fair search — ce20 is the sweet
+  spot, ce1 safe-but-slower, ce100 catastrophic (no pruning → DFS grinds
+  whole size levels). The `-dfs` arms at ce≈20 are the reference config now.
+  **Next (spawned):** make ce20-ish the arm default + re-baseline; reconsider
+  whether the explicit-scheduler item (reading the residual frontier) still
+  pays now that a two-line DFS mplus captured most of the wall-clock on offer
+  from dropping fair interleaving.
 
 - [x] **1. Generalize the termination view beyond fixed-position
   decrease** — RESOLVED. R2P (`permuted-decreasing-recursiono/d`,
